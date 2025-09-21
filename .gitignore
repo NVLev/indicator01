@@ -1,0 +1,27 @@
+# Исключение кешированных файлов Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+# Игнорировать директорию виртуальной среды
+.venv/
+# Игнорировать файл .env с конфиденциальными данными
+#.env
+# Исключаем файлы зависимостей и кеши IDE
+*.swp
+*.swo
+.vscode/
+.idea/
+*.iml
+*.ipr
+*.iws
+*.log
+# исключаем dockerFail
+#.docker-compose.yml
+celerybeat-schedule.dat
+audio.zip
+/audio/
+.pytest_cache/
+/models/
+.env
+
