@@ -204,18 +204,6 @@ class AuthService:
         await cls.persist_refresh_token(
             user.id, refresh_token, jti, issued_at, expires_at, session
         )
-        # hashed_refresh = pwd_context.hash(refresh_token)
-        # db_refresh_token = RefreshToken(
-        #     user_id=user.id,
-        #     jti=jti,
-        #     token_hash=hashed_refresh,
-        #     issued_at=issued_at,
-        #     expires_at=datetime.now(timezone.utc)
-        #     + timedelta(days=settings.auth.REFRESH_EXPIRE_DAYS),
-        #     revoked=False,
-        # )
-        # session.add(db_refresh_token)
-        # await session.commit()
 
         return {
             "access_token": access_token,

@@ -1,10 +1,14 @@
 import json
 from enum import Enum
-from pydantic import BaseModel, EmailStr, Field, field_validator
+from pydantic import BaseModel, EmailStr, Field, field_validator, ConfigDict
 from datetime import datetime
 from typing import List, Optional, Dict, Any, Union
+from enum import Enum
+from .models import StudyStatus
 
 
+
+# Модели для авторизации
 
 class UserBase(BaseModel):
     email: EmailStr = Field(..., description="Email пользователя")
@@ -59,3 +63,97 @@ class TokenResponse(BaseModel):
 
 class RefreshTokenRequest(BaseModel):
     refresh_token: str
+
+
+# Схемы для обработки исследований
+
+class StudyBase(BaseModel):
+    """Базовая схема исследований"""
+    filename: str
+
+
+class StudyCreate(StudyBase):
+    """Схема для создания нового исследования"""
+    pass
+
+
+class StudyUpdate(BaseModel):
+    """Схема для обновления результатов обработки исследования"""
+    study_uid: Optional[str] = None
+    series_uid: Optional[str] = None
+    processing_status: Optional[StudyStatus] = None
+    probability_of_pathology: Optional[float] = None
+    pathology: Optional[int] = None
+    time_of_processing: Optional[float] = None
+    most_dangerous_pathology_type: Optional[str] = None
+    pathology_localization_coords: Optional[Dict[str, float]] = None  # Changed from string to dict
+    heatmap_path: Optional[str] = None
+    heatmap_format: Optional[str] = None
+    heatmap_metadata: Optional[Dict[str, Any]] = None
+    error_message: Optional[str] = None
+
+
+class StudyResponse(StudyBase):
+    """Схема для ответа"""
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    user_id: int
+    file_path: str
+    path_to_study: Optional[str] = None
+    study_uid: Optional[str] = None
+    series_uid: Optional[str] = None
+    processing_status: StudyStatus  # Changed to enum
+    probability_of_pathology: Optional[float] = None
+    pathology: Optional[int] = None
+    time_of_processing: Optional[float] = None
+    most_dangerous_pathology_type: Optional[str] = None
+    pathology_localization_coords: Optional[Dict[str, float]] = None  # Changed from string to dict
+    heatmap_path: Optional[str] = None
+    heatmap_format: Optional[str] = None
+    heatmap_metadata: Optional[Dict[str, Any]] = None
+    total_instances: Optional[int] = None
+    series_count: Optional[int] = None
+    error_message: Optional[str] = None
+    ready_for_inference: bool
+    inference_completed: bool
+    created_at: datetime
+    updated_at: datetime
+
+
+class StudyListResponse(BaseModel):
+    """Схема для списка исследований с пагинацией"""
+    studies: List[StudyResponse]
+    total: int
+    page: int
+    per_page: int
+
+
+class StudyStatusResponse(BaseModel):
+    """Простой ответ по статусу"""
+    id: int
+    processing_status: StudyStatus  # Changed to enum
+    progress: Optional[float] = None  # For future progress tracking
+    error_message: Optional[str] = None
+
+
+class ExcelReportRequest(BaseModel):
+    """Схема генерации отчета в Excel"""
+    study_ids: List[int]
+    include_metadata: bool = True
+
+
+# Additional schema for localization coordinates
+class PathologyLocalization(BaseModel):
+    """Схема для координат локализации патологии"""
+    x_min: float
+    x_max: float
+    y_min: float
+    y_max: float
+    z_min: float
+    z_max: float
+    confidence: Optional[float] = None
+
+
+
+

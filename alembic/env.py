@@ -7,7 +7,7 @@ from sqlalchemy import pool
 from sqlalchemy.ext.asyncio import async_engine_from_config
 from alembic import context
 
-from backend.app.core.models import Base
+from backend.app.core.models import Base, User, RefreshToken, Study
 from backend.app.core.config import settings
 import asyncio
 
