@@ -17,6 +17,7 @@ passlib==1.7.4
 pyasn1==0.6.1
 pycparser==2.23
 pydantic==2.11.9
+pydantic[email]==2.11.9
 pydantic-settings==2.10.1
 pydantic_core==2.33.2
 python-dotenv==1.1.1
