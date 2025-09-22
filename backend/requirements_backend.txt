@@ -36,3 +36,20 @@ typing-inspection==0.4.1
 typing_extensions==4.15.0
 tzdata==2025.2
 uvicorn==0.35.0
+# for file upload
+python-multipart==0.0.20
+
+
+# for worker tasks
+amqp==5.3.1
+billiard==4.2.2
+celery==5.5.3
+click-didyoumean==0.3.1
+click-plugins==1.1.1.2
+click-repl==0.3.0
+kombu==5.5.4
+packaging==25.0
+prompt-toolkit==3.0.52
+vine==5.1.0
+wcwidth==0.2.14
+redis==6.4.0
