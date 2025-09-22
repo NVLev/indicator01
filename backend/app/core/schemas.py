@@ -127,6 +127,7 @@ class StudyListResponse(BaseModel):
     total: int
     page: int
     per_page: int
+    total_pages: int
 
 
 class StudyStatusResponse(BaseModel):
