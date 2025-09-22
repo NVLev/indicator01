@@ -143,7 +143,7 @@ class ExcelReportRequest(BaseModel):
     include_metadata: bool = True
 
 
-# Additional schema for localization coordinates
+# Дополнительная схема для координат локализации
 class PathologyLocalization(BaseModel):
     """Схема для координат локализации патологии"""
     x_min: float
