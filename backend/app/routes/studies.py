@@ -1,5 +1,3 @@
-# routes/studies.py
-
 import os
 import tempfile
 from typing import List
@@ -33,22 +31,15 @@ async def upload_study(
     - Формат: ZIP архив с DICOM файлами
     - Обработка занимает до 10 минут
     """
-    # Валидация файла
-    if not file.filename or not file.filename.lower().endswith('.zip'):
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Поддерживаются только ZIP-архивы"
-        )
 
-    # Проверка размера файла
-    max_size = 500 * 1024 * 1024  # 500MB
-    if file.size and file.size > max_size:
-        raise HTTPException(
-            status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
-            detail=f"Файл слишком большой. Максимальный размер: {max_size // (1024 * 1024)}MB"
-        )
-
+    file_path = None
     try:
+        # Валидация файла
+        if not file.filename or not file.filename.lower().endswith('.zip'):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Поддерживаются только ZIP-архивы"
+            )
         # Создаем директорию для загруженных файлов
         upload_dir = Path("uploads") / str(current_user.id)
         upload_dir.mkdir(parents=True, exist_ok=True)
@@ -62,7 +53,7 @@ async def upload_study(
 
         # Создаем запись в БД
         study = await StudyService.create_study(
-            user_id=current_user.id,
+            user_id=current_user.id,  # noqa: PyCharm ложное срабатывание
             filename=file.filename,
             file_path=str(file_path),
             session=session
@@ -110,7 +101,7 @@ async def get_user_studies(
     offset = (page - 1) * per_page
 
     studies = await StudyService.get_user_studies(
-        user_id=current_user.id,
+        user_id=current_user.id,    # noqa: PyCharm ложное срабатывание
         session=session,
         limit=per_page,
         offset=offset
@@ -139,7 +130,7 @@ async def get_study(
     """
     Получить детальную информацию о конкретном исследовании
     """
-    study = await StudyService.get_study(study_id, current_user.id, session)
+    study = await StudyService.get_study(study_id, current_user.id, session) # noqa: PyCharm ложное срабатывание
 
     if not study:
         raise HTTPException(
@@ -147,7 +138,7 @@ async def get_study(
             detail="Исследование не найдено"
         )
 
-    return StudyResponse.model_validate(study)
+    return StudyResponse.model_validate(study)  # noqa: игнорируй эту ошибку
 
 
 @router.get("/{study_id}/progress", summary="Прогресс обработки")
@@ -161,7 +152,7 @@ async def get_task_progress(
 
     Возвращает текущий статус, процент выполнения и сообщение о состоянии
     """
-    study = await StudyService.get_study(study_id, current_user.id, session)
+    study = await StudyService.get_study(study_id, current_user.id, session) # noqa: PyCharm ложное срабатывание
 
     if not study:
         raise HTTPException(status_code=404, detail="Исследование не найдено")
