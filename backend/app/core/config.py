@@ -1,6 +1,8 @@
 from pydantic import BaseModel
 from pydantic_settings import BaseSettings, SettingsConfigDict
-
+class CeleryConfig(BaseModel):
+    broker_url: str = "redis://redis:6379/0"
+    result_backend: str = "redis://redis:6379/0"
 
 class RunConfig(BaseModel):
     host: str = "0.0.0.0"
@@ -26,6 +28,7 @@ class Settings(BaseSettings):
     run: RunConfig = RunConfig()
     db: DatabaseConfig = DatabaseConfig()
     auth: AuthConfig = AuthConfig()
+    celery: CeleryConfig = CeleryConfig()
 
     model_config = SettingsConfigDict(
         env_file=".env",

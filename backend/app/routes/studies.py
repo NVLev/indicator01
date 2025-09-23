@@ -12,7 +12,7 @@ from ..core.models import User, Study, StudyStatus
 from ..core.schemas import StudyResponse, StudyListResponse, ExcelReportRequest
 from ..services.study_service import StudyService, create_excel_report
 from ..services.security import get_current_user
-from ....backend.workers.tasks import process_complete_study_task
+from workers.tasks import process_complete_study_task
 
 
 router = APIRouter(prefix="/studies", tags=["Исследования"])

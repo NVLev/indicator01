@@ -1,22 +1,26 @@
 import time
 import asyncio
+import os
 from typing import Dict, Any
 from celery import Celery
 from celery.utils.log import get_task_logger
 from sqlalchemy import create_engine, func
 from sqlalchemy.orm import sessionmaker
 
-from ..app.core.config import settings
-from ..app.core.models import Study, StudyStatus
-from ..app.services.study_service import _process_dicom_study_sync
+from app.core.config import settings
+from app.core.models import Study, StudyStatus
+from app.services.study_service import _process_dicom_study_sync
 
 logger = get_task_logger(__name__)
 
 # Конфигурация Celery
+CELERY_BROKER_URL = os.getenv("CELERY_BROKER_URL", "redis://redis:6379/0")
+CELERY_RESULT_BACKEND = os.getenv("CELERY_RESULT_BACKEND", "redis://redis:6379/0")
+
 celery_app = Celery(
     "indicator01",
-    broker=getattr(settings, 'CELERY_BROKER_URL', 'redis://localhost:6379/0'),
-    backend=getattr(settings, 'CELERY_RESULT_BACKEND', 'redis://localhost:6379/0'),
+    broker=CELERY_BROKER_URL,
+    backend=CELERY_RESULT_BACKEND,
 )
 
 # Настройки Celery
