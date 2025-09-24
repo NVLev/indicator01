@@ -86,11 +86,22 @@ class StudyUpdate(BaseModel):
     pathology: Optional[int] = None
     time_of_processing: Optional[float] = None
     most_dangerous_pathology_type: Optional[str] = None
-    pathology_localization_coords: Optional[Dict[str, float]] = None  # Changed from string to dict
+    pathology_localization_coords: Optional[Dict[str, float]] = None
     heatmap_path: Optional[str] = None
     heatmap_format: Optional[str] = None
     heatmap_metadata: Optional[Dict[str, Any]] = None
     error_message: Optional[str] = None
+
+# Дополнительная схема для координат локализации
+class PathologyLocalization(BaseModel):
+    """Схема для координат локализации патологии"""
+    x_min: float
+    x_max: float
+    y_min: float
+    y_max: float
+    z_min: float
+    z_max: float
+    confidence: Optional[float] = None
 
 class StudyResponse(StudyBase):
     """Схема для ответа"""
@@ -102,12 +113,12 @@ class StudyResponse(StudyBase):
     path_to_study: Optional[str] = None
     study_uid: Optional[str] = None
     series_uid: Optional[str] = None
-    processing_status: str  # Измените с StudyStatus на str
+    processing_status: str
     probability_of_pathology: Optional[float] = None
     pathology: Optional[int] = None
     time_of_processing: Optional[float] = None
     most_dangerous_pathology_type: Optional[str] = None
-    pathology_localization_coords: Optional[Dict[str, float]] = None
+    pathology_localization_coords: Optional[PathologyLocalization] = None
     heatmap_path: Optional[str] = None
     heatmap_format: Optional[str] = None
     heatmap_metadata: Optional[Dict[str, Any]] = None
@@ -171,8 +182,8 @@ class StudyListResponse(BaseModel):
 class StudyStatusResponse(BaseModel):
     """Простой ответ по статусу"""
     id: int
-    processing_status: StudyStatus  # Changed to enum
-    progress: Optional[float] = None  # For future progress tracking
+    processing_status: StudyStatus
+    progress: Optional[float] = None
     error_message: Optional[str] = None
 
 

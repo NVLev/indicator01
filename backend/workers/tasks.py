@@ -7,7 +7,9 @@ from celery.utils.log import get_task_logger
 from app.core.config import settings
 from app.core.models import StudyStatus
 from app.services.study_service import _process_dicom_study_sync
-from .sync_db import update_study_status_sync, update_study_results_sync  # Используем новые функции
+from .ml_inference import get_ml_service
+from .verification_engine import verification_engine
+from .sync_db import update_study_status_sync, update_study_results_sync
 
 logger = get_task_logger(__name__)
 
@@ -182,26 +184,68 @@ def _run_ml_inference_fast(organized_path: str, study_id: int) -> Dict:
     logger.info(f"Запуск ML анализа для исследования {study_id}")
     start_time = time.time()
 
-    # Симуляция быстрого ML анализа
-    time.sleep(2)  # Уменьшим время для тестирования
+    try:
+        ml_service = get_ml_service()
+        ml_results = ml_service.analyze_study(organized_path, study_id)
 
+        # Верификация результатов (особенно для "норма")
+        verification_results = None
+        if ml_results.get("pathology") == 0:  # Если модель сказала "норма"
+            heatmap_data = ml_results.get("heatmap_data", {})
+            verification_results = verification_engine.validate_normal_prediction(
+                heatmap_data, study_id
+            )
+
+            # Если верификация показала проблемы - меняем статус
+            if not verification_results.get("достоверно", True):
+                ml_results["processing_status"] = "needs_review"
+                ml_results["verification_warnings"] = verification_results.get("предупреждения", [])
+
+        # Локализация патологии из heatmap
+        localization = None
+        if ml_results.get("pathology") == 1 and ml_results.get("heatmap_statistics"):
+            stats = ml_results["heatmap_statistics"]
+            # Простая логика локализации - можно улучшить
+            if stats.get("max_error", 0) > 0.1:  # Порог для значимой аномалии
+                localization = {
+                    "x_min": 0.0,
+                    "x_max": float(ml_results.get("heatmap_shape", [128, 128, 64])[0]),
+                    "y_min": 0.0,
+                    "y_max": float(ml_results.get("heatmap_shape", [128, 128, 64])[1]),
+                    "z_min": float(ml_results.get("max_error_slice_index", 0)),
+                    "z_max": float(ml_results.get("max_error_slice_index", 0) + 1),
+                    "confidence": stats.get("max_error", 0.0)
+                }
+
+        return {
+            "probability_of_pathology": ml_results["probability_of_pathology"],
+            "pathology": ml_results["pathology"],
+            "most_dangerous_pathology_type": "пневмония" if ml_results["pathology"] else "",
+            "pathology_localization_coords": localization,
+            "heatmap_path": ml_results.get("heatmap_path", ""),
+            "heatmap_format": ml_results.get("heatmap_format", ""),
+            "heatmap_metadata": {
+                "statistics": ml_results.get("heatmap_statistics", {}),
+                "max_slice": ml_results.get("max_error_slice_index", 0),
+                "verification": verification_results
+            },
+            "processing_status": ml_results.get("processing_status", "completed"),
+            "needs_review": not verification_results.get("достоверно", True) if verification_results else False
+        }
+
+    except Exception as e:
+        logger.error(f"Ошибка ML inference для исследования {study_id}: {e}")
+        return {
+            "probability_of_pathology": 0.0,
+            "pathology": 0,
+            "processing_status": "failed",
+            "error_message": str(e)
+        }
     ml_time = time.time() - start_time
 
-    # Симуляция результатов ML анализа
-    probability = random.uniform(0.1, 0.9)
-    pathology = 1 if probability > 0.5 else 0
 
-    return {
-        "probability_of_pathology": round(probability, 4),
-        "pathology": pathology,
-        "most_dangerous_pathology_type": "пневмония" if pathology else "",
-        "pathology_localization_coords": {
-            "x_min": 100.0, "x_max": 200.0,
-            "y_min": 150.0, "y_max": 250.0,
-            "z_min": 10.0, "z_max": 20.0
-        } if pathology else None,
-        "processing_status": "completed"
-    }
+
+
 
 
 @celery_app.task(name="cleanup_old_files_task")

@@ -9,15 +9,15 @@ RUN apt-get update && apt-get install -y \
     redis-tools \
     && rm -rf /var/lib/apt/lists/*
 
-COPY backend/requirements_backend.txt .
+COPY requirements.txt .
 
 RUN pip install --upgrade pip && \
-    pip install --no-cache-dir -r requirements_backend.txt
+    pip install --no-cache-dir -r requirements.txt
 
-# Копируем весь бэкенд в /app/backend
 COPY backend /app/backend
+COPY ML_model /app/ML_model
 
-ENV PYTHONPATH=/app/backend
+ENV PYTHONPATH=/app/backend:/app
 
 RUN mkdir -p /app/uploads /app/processed_studies
 
