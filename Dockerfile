@@ -14,10 +14,10 @@ COPY requirements.txt .
 RUN pip install --upgrade pip && \
     pip install --no-cache-dir -r requirements.txt
 
+# Копируем весь бэкенд в /app/backend
 COPY backend /app/backend
-COPY ML_model /app/ML_model
 
-ENV PYTHONPATH=/app/backend:/app
+ENV PYTHONPATH=/app/backend
 
 RUN mkdir -p /app/uploads /app/processed_studies
 

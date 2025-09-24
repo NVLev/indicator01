@@ -2,7 +2,7 @@ import sys
 import os
 
 
-from ML_model.inference_with_heatmap import CTInferenceProcessor
+from ML_model.Inference_with_heatmap import CTInferenceProcessor
 import numpy as np
 from pathlib import Path
 import tempfile

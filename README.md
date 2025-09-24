@@ -18,16 +18,22 @@ indicator01/
 │   │   │   ├── models.py         # ORM-модели
 │   │   │   ├── schemas.py        # Pydantic-схемы
 │   │   │   ├── db_helper.py      # Настройки соединения с БД (асинхронный генератор сессий)
-│   │   │   ├── config.py         # Конфигурация (пути, параметры сервиса)
+│   │   │   └── config.py         # Конфигурация (пути, параметры сервиса)
 │   │   │
 │   ├── workers/              # Фоновые задачи/воркеры
 │   │   │   ├── tasks.py          # Задачи Celery
 │   │   │   └── worker.py         # Настройки Celery
 │   │   │
 │   ├── requirements_backend.txt  # Зависимости бэкенда
+│   ├── ML_model/               # Код для использования обученных моделей
+│   │   │   ├── heatmap.py    
+│   │   │   ├── Inference.py 
+│   │   │   ├── ML_model.py       
+│   │   │   └── Inference_with_heatmap.py         
+│  
 │   
 │
-├── inference/                    # Код для использования обученных моделей
+├── inference/                   
 │
 ├── Dockerfile                # Контейнеризация бэкенда
 ├── docker-compose.yml            # Оркестрация сервисов
