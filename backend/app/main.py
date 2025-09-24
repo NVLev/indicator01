@@ -2,7 +2,7 @@ import uvicorn
 from fastapi import FastAPI
 from contextlib import asynccontextmanager
 
-from .routes import auth
+from .routes import auth, studies
 from .core.db_helper import db_helper
 
 
@@ -26,3 +26,4 @@ app = FastAPI(lifespan=lifespan)
 
 
 app.include_router(auth.router)
+app.include_router(studies.router)

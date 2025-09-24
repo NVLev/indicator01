@@ -9,17 +9,16 @@ RUN apt-get update && apt-get install -y \
     redis-tools \
     && rm -rf /var/lib/apt/lists/*
 
-
-COPY backend/requirements_backend.txt /app/
+COPY backend/requirements_backend.txt .
 
 RUN pip install --upgrade pip && \
     pip install --no-cache-dir -r requirements_backend.txt
 
-
+# Копируем весь бэкенд в /app/backend
 COPY backend /app/backend
 
-ENV PYTHONPATH=/app
+ENV PYTHONPATH=/app/backend
 
 RUN mkdir -p /app/uploads /app/processed_studies
 
-CMD ["uvicorn", "backend.app.main:app", "--host", "0.0.0.0", "--port", "8010"]
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8010"]

@@ -93,6 +93,32 @@ class StudyUpdate(BaseModel):
     error_message: Optional[str] = None
 
 
+# class StudyResponse(StudyBase):
+#     """Схема для ответа"""
+#     model_config = ConfigDict(from_attributes=True)
+#
+#     id: int
+#     user_id: int
+#     file_path: str
+#     path_to_study: Optional[str] = None
+#     study_uid: Optional[str] = None
+#     series_uid: Optional[str] = None
+#     processing_status: StudyStatus
+#     probability_of_pathology: Optional[float] = None
+#     pathology: Optional[int] = None
+#     time_of_processing: Optional[float] = None
+#     most_dangerous_pathology_type: Optional[str] = None
+#     pathology_localization_coords: Optional[Dict[str, float]] = None  # Changed from string to dict
+#     heatmap_path: Optional[str] = None
+#     heatmap_format: Optional[str] = None
+#     heatmap_metadata: Optional[Dict[str, Any]] = None
+#     total_instances: Optional[int] = None
+#     series_count: Optional[int] = None
+#     error_message: Optional[str] = None
+#     ready_for_inference: bool
+#     inference_completed: bool
+#     created_at: datetime
+#     updated_at: datetime
 class StudyResponse(StudyBase):
     """Схема для ответа"""
     model_config = ConfigDict(from_attributes=True)
@@ -103,12 +129,12 @@ class StudyResponse(StudyBase):
     path_to_study: Optional[str] = None
     study_uid: Optional[str] = None
     series_uid: Optional[str] = None
-    processing_status: StudyStatus  # Changed to enum
+    processing_status: str  # Измените с StudyStatus на str
     probability_of_pathology: Optional[float] = None
     pathology: Optional[int] = None
     time_of_processing: Optional[float] = None
     most_dangerous_pathology_type: Optional[str] = None
-    pathology_localization_coords: Optional[Dict[str, float]] = None  # Changed from string to dict
+    pathology_localization_coords: Optional[Dict[str, float]] = None
     heatmap_path: Optional[str] = None
     heatmap_format: Optional[str] = None
     heatmap_metadata: Optional[Dict[str, Any]] = None
@@ -119,6 +145,42 @@ class StudyResponse(StudyBase):
     inference_completed: bool
     created_at: datetime
     updated_at: datetime
+
+    @field_validator('processing_status', mode='before')
+    @classmethod
+    def validate_processing_status(cls, v):
+        """Преобразуем статусы в русскоязычные для ответа"""
+        status_mapping = {
+            'uploaded': 'загружено',
+            'extracting': 'распаковывается',
+            'validating': 'проверяется',
+            'processing_ml': 'анализируется_ИИ',
+            'completed': 'обработано',
+            'failed': 'ошибка',
+            'needs_review': 'требует_проверки',
+            # Английские версии на всякий случай
+            'UPLOADED': 'загружено',
+            'EXTRACTING': 'распаковывается',
+            'VALIDATING': 'проверяется',
+            'PROCESSING_ML': 'анализируется_ИИ',
+            'COMPLETED': 'обработано',
+            'FAILED': 'ошибка',
+            'NEEDS_REVIEW': 'требует_проверки'
+        }
+
+        if isinstance(v, StudyStatus):
+            return v.value
+        elif isinstance(v, str):
+            return status_mapping.get(v.lower(), v)
+        return v
+
+    @field_validator('created_at', 'updated_at', mode='before')
+    @classmethod
+    def validate_datetime(cls, v):
+        """Преобразуем datetime объекты в строки для сериализации"""
+        if v is None:
+            return None
+        return v.isoformat() if hasattr(v, 'isoformat') else v
 
 
 class StudyListResponse(BaseModel):

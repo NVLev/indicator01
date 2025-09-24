@@ -82,7 +82,7 @@ class Study(Base):
     user_id: Mapped[int] = mapped_column(
         ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True
     )
-
+    task_id: Mapped[Optional[str]] = mapped_column(String(255), index=True)  # ID задачи Celery
     # Необходимые поля, согласно спецификации
     filename: Mapped[str] = mapped_column(String(255), nullable=False)
     file_path: Mapped[str] = mapped_column(String(500), nullable=False)

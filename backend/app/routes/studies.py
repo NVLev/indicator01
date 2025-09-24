@@ -60,7 +60,7 @@ async def upload_study(
         )
 
         # Запускаем обработку в Celery
-        task_result = process_complete_study_task.delay(  # ← ИСПРАВЛЕНО
+        task_result = process_complete_study_task.delay(
             zip_file_path=str(file_path),
             study_id=study.id
         )
@@ -68,8 +68,33 @@ async def upload_study(
         # Сохраняем ID задачи для отслеживания
         study.task_id = task_result.id
         await session.commit()
-
-        return StudyResponse.model_validate(study)
+        await session.refresh(study)
+        study_data = {
+            "id": study.id,
+            "user_id": study.user_id,
+            "filename": study.filename,
+            "file_path": study.file_path,
+            "path_to_study": study.path_to_study,
+            "study_uid": study.study_uid,
+            "series_uid": study.series_uid,
+            "processing_status": study.processing_status,
+            "probability_of_pathology": study.probability_of_pathology,
+            "pathology": study.pathology,
+            "time_of_processing": study.time_of_processing,
+            "most_dangerous_pathology_type": study.most_dangerous_pathology_type,
+            "pathology_localization_coords": study.pathology_localization_coords,
+            "heatmap_path": study.heatmap_path,
+            "heatmap_format": study.heatmap_format,
+            "heatmap_metadata": study.heatmap_metadata,
+            "total_instances": study.total_instances,
+            "series_count": study.series_count,
+            "error_message": study.error_message,
+            "ready_for_inference": study.ready_for_inference,
+            "inference_completed": study.inference_completed,
+            "created_at": study.created_at,
+            "updated_at": study.updated_at
+        }
+        return StudyResponse(**study_data)
 
     except Exception as e:
         # Удаляем файл в случае ошибки
@@ -113,7 +138,7 @@ async def get_user_studies(
     total = total_result.scalar()
 
     return StudyListResponse(
-        studies=[StudyResponse.fmodel_validate(study) for study in studies],
+        studies=[StudyResponse.model_validate(study) for study in studies],
         total=total,
         page=page,
         per_page=per_page,
@@ -156,7 +181,16 @@ async def get_task_progress(
 
     if not study:
         raise HTTPException(status_code=404, detail="Исследование не найдено")
-
+    try:
+        # Если статус уже является enum, оставляем как есть
+        if isinstance(study.processing_status, StudyStatus):
+            status_enum = study.processing_status
+        else:
+            status_enum = StudyStatus(study.processing_status)
+    except ValueError:
+        # Если статус неизвестен, используем статус по умолчанию
+        status_enum = StudyStatus.FAILED
+    task_id = getattr(study, 'task_id', None)
     # Если нет task_id, используем базовый статус
     if not study.task_id:
         progress_map = {
@@ -171,14 +205,14 @@ async def get_task_progress(
 
         return {
             "study_id": study.id,
-            "status": study.processing_status.value,
+            "status": status_enum.value,
             "progress": progress_map.get(study.processing_status, 0),
-            "message": f"Статус: {study.processing_status.value}",
+            "message": f"Статус: {sstatus_enum.value}",
             "estimated_time": "До 10 минут"
         }
 
     # Получаем статус задачи из Celery
-    from ..workers.tasks import celery_app
+    from workers.tasks import celery_app
     task_result = celery_app.AsyncResult(study.task_id)
 
     response = {
