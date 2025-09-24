@@ -92,33 +92,6 @@ class StudyUpdate(BaseModel):
     heatmap_metadata: Optional[Dict[str, Any]] = None
     error_message: Optional[str] = None
 
-
-# class StudyResponse(StudyBase):
-#     """Схема для ответа"""
-#     model_config = ConfigDict(from_attributes=True)
-#
-#     id: int
-#     user_id: int
-#     file_path: str
-#     path_to_study: Optional[str] = None
-#     study_uid: Optional[str] = None
-#     series_uid: Optional[str] = None
-#     processing_status: StudyStatus
-#     probability_of_pathology: Optional[float] = None
-#     pathology: Optional[int] = None
-#     time_of_processing: Optional[float] = None
-#     most_dangerous_pathology_type: Optional[str] = None
-#     pathology_localization_coords: Optional[Dict[str, float]] = None  # Changed from string to dict
-#     heatmap_path: Optional[str] = None
-#     heatmap_format: Optional[str] = None
-#     heatmap_metadata: Optional[Dict[str, Any]] = None
-#     total_instances: Optional[int] = None
-#     series_count: Optional[int] = None
-#     error_message: Optional[str] = None
-#     ready_for_inference: bool
-#     inference_completed: bool
-#     created_at: datetime
-#     updated_at: datetime
 class StudyResponse(StudyBase):
     """Схема для ответа"""
     model_config = ConfigDict(from_attributes=True)
@@ -145,6 +118,9 @@ class StudyResponse(StudyBase):
     inference_completed: bool
     created_at: datetime
     updated_at: datetime
+    needs_review: bool = Field(False, description="Требуется проверка врачом")
+    verification_score: Optional[float] = Field(None, description="Оценка достоверности AI")
+    verification_warnings: List[str] = Field([], description="Предупреждения верификации")
 
     @field_validator('processing_status', mode='before')
     @classmethod

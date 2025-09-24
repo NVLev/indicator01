@@ -1,4 +1,3 @@
-
 from typing import Optional, List, Dict, Any
 from xmlrpc.client import boolean
 from datetime import timedelta
@@ -127,6 +126,11 @@ class Study(Base):
     # статусы обработки ML
     ready_for_inference: Mapped[bool] = mapped_column(Boolean, default=False, index=True)
     inference_completed: Mapped[bool] = mapped_column(Boolean, default=False)
+
+    # Поля для верификации
+    needs_verification: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    verification_results: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)
+    verification_score: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
 
     # Relationships
     user: Mapped["User"] = relationship("User", back_populates="studies")
