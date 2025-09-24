@@ -34,25 +34,109 @@ services:
       - "5050:80"
     networks:
       - indicator_net
+
   backend:
-      build:
-        context: .
-        dockerfile: Dockerfile
-      container_name: indicator_backend
-      ports:
-        - "8000:8010"
-      env_file:
-        - .env
-      volumes:
-        - ./backend:/app/backend
-      depends_on:
-        pg:
-          condition: service_healthy
-      networks:
-        - indicator_net
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: indicator_backend
+    ports:
+      - "8000:8010"
+    env_file:
+      - .env
+    volumes:
+      - ./uploads:/app/uploads
+      - ./processed_studies:/app/processed_studies
+      - ./backend:/app/backend
+    working_dir: /app/backend
+    depends_on:
+      pg:
+        condition: service_healthy
+    networks:
+      - indicator_net
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6380:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: [ "CMD", "redis-cli", "ping" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - indicator_net
+
+  celery_worker:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    working_dir: /app/backend
+    environment:
+      - APP_CONFIG__DB__URL=postgresql+asyncpg://user:password@pg:5432/indicator
+      - REDIS_URL=redis://redis:6379/0
+      - PYTHONPATH=/app/backend
+    volumes:
+      - ./uploads:/app/uploads
+      - ./processed_studies:/app/processed_studies
+      - ./backend:/app/backend
+    depends_on:
+      pg:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - indicator_net
+    command: ["celery", "-A", "workers.tasks", "worker", "--loglevel=info", "--concurrency=2"]
+
+  celery_beat:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    working_dir: /app/backend
+    environment:
+      - APP_CONFIG__DB__URL=postgresql+asyncpg://user:password@pg:5432/indicator
+      - REDIS_URL=redis://redis:6379/0
+      - PYTHONPATH=/app/backend
+    volumes:
+      - ./uploads:/app/uploads
+      - ./processed_studies:/app/processed_studies
+      - ./backend:/app/backend
+    depends_on:
+      pg:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - indicator_net
+    command: ["celery", "-A", "workers.tasks", "beat", "--loglevel=info"]
+
+  flower:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    working_dir: /app/backend
+    ports:
+      - "5555:5555"
+    environment:
+      - REDIS_URL=redis://redis:6379/0
+      - PYTHONPATH=/app/backend
+    volumes:
+      - ./backend:/app/backend
+    depends_on:
+      - redis
+    networks:
+      - indicator_net
+    profiles:
+      - monitoring
+    command: ["celery", "-A", "workers.tasks", "flower", "--port=5555"]
+
 volumes:
   pgdata:
+  redis_data:
 
 networks:
   indicator_net:
-
+    driver: bridge
