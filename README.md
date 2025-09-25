@@ -37,6 +37,6 @@ indicator01/
 │
 ├── Dockerfile                # Контейнеризация бэкенда
 ├── docker-compose.yml            # Оркестрация сервисов
-├── requirements.txt              # Общие зависимости (training + inference)
+├── requirements_bareaking.txt              # Общие зависимости (training + inference)
 └── README.md                     # Документация
 ```

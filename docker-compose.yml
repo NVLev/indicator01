@@ -48,12 +48,12 @@ services:
       - ./uploads:/app/uploads
       - ./processed_studies:/app/processed_studies
       - ./backend:/app/backend
-    working_dir: /app/backend
     depends_on:
       pg:
         condition: service_healthy
     networks:
       - indicator_net
+
 
   redis:
     image: redis:7-alpine
