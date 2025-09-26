@@ -97,7 +97,7 @@ services:
       - PYTHONPATH=/app/backend
     volumes:
       - shared_uploads:/app/backend/uploads
-      - ./processed_studies:/app/backend/processed_studies
+      - ./processed_studies:/app/processed_studies
       - ./backend:/app/backend
     depends_on:
       pg:
@@ -119,7 +119,7 @@ services:
       - PYTHONPATH=/app/backend
     volumes:
       - shared_uploads:/app/backend/uploads
-      - ./processed_studies:/app/backend/processed_studies
+      - ./processed_studies:/app/processed_studies
       - ./backend:/app/backend
     depends_on:
       pg:

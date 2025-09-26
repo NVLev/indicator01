@@ -6,13 +6,16 @@ from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, status
 from fastapi.responses import FileResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import func, select
-
+import logging
 from ..core.db_helper import db_helper
 from ..core.models import User, Study, StudyStatus
 from ..core.schemas import StudyResponse, StudyListResponse, ExcelReportRequest
 from ..services.study_service import StudyService, create_excel_report
 from ..services.security import get_current_user
 from workers.tasks import process_complete_study_task
+
+logger = logging.getLogger(__name__)
+
 
 
 router = APIRouter(prefix="/studies", tags=["Исследования"])
@@ -41,7 +44,7 @@ async def upload_study(
                 detail="Поддерживаются только ZIP-архивы"
             )
         # Создаем директорию для загруженных файлов
-        upload_dir = Path("uploads") / str(current_user.id)
+        upload_dir = Path("/app/backend/uploads") / str(current_user.id)
         upload_dir.mkdir(parents=True, exist_ok=True)
 
         # Сохраняем файл
@@ -50,7 +53,11 @@ async def upload_study(
 
         with open(file_path, "wb") as buffer:
             buffer.write(content)
-
+        if not file_path.exists() or file_path.stat().st_size == 0:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Не удалось сохранить файл на сервер"
+            )
         # Создаем запись в БД
         study = await StudyService.create_study(
             user_id=current_user.id,  # noqa: PyCharm ложное срабатывание
@@ -64,6 +71,9 @@ async def upload_study(
             zip_file_path=str(file_path),
             study_id=study.id
         )
+
+        # Логируем успешное сохранение
+        logger.info(f"Файл успешно сохранен: {file_path}, размер: {file_path.stat().st_size} байт")
 
         # Сохраняем ID задачи для отслеживания
         study.task_id = task_result.id
