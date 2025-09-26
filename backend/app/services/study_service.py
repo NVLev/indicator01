@@ -138,6 +138,7 @@ def _process_dicom_study_sync(
         logger.info(f"Извлечение исследования {study_id} во временную папку {temp_extract_dir}")
 
         dicom_files = extract_zip_archive(zip_file_path, temp_extract_dir)
+
         if not dicom_files:
             raise DicomProcessingError("В архиве не найдено DICOM-файлов")
 
@@ -373,15 +374,20 @@ def extract_zip_archive(zip_path: str, extract_to: str) -> List[Path]:
     скрытые файлы, и пытаемся отфильтровать не-DICOM.
     """
     extracted_files: List[Path] = []
+    logger.info("Начало обработки")
     try:
-        if not zipfile.is_zipfile(zip_path):
-            raise DicomProcessingError("Файл не является ZIP-архивом")
+        with zipfile.ZipFile(zip_path, 'r') as zip_ref:
+            bad_file = zip_ref.testzip()
+            if bad_file:
+                raise DicomProcessingError(f"Повреждённый файл в архиве: {bad_file}")
+
 
         with zipfile.ZipFile(zip_path, "r") as zip_ref:
             file_list = [
                 f for f in zip_ref.namelist()
                 if not f.endswith("/") and not os.path.basename(f).startswith(".")
             ]
+            logger.info(f" Найдено {len(file_list)} файлов в архиве: {file_list[:5]}...")
             if not file_list:
                 raise DicomProcessingError("ZIP-архив пуст")
 
@@ -390,10 +396,12 @@ def extract_zip_archive(zip_path: str, extract_to: str) -> List[Path]:
                 try:
                     extracted_path_str = zip_ref.extract(file_name, extract_to)
                     extracted_path = Path(extracted_path_str)
+                    logger.debug(f"Checking if {extracted_path.name} is DICOM...")
                     if is_likely_dicom_file(extracted_path):
                         extracted_files.append(extracted_path)
+                        logger.debug(f"✓ {extracted_path.name} identified as DICOM")
                     else:
-                        # удаляем ненужные извлеченные файлы
+                        logger.debug(f"✗ {extracted_path.name} not identified as DICOM")
                         try:
                             os.remove(extracted_path)
                         except Exception:
@@ -407,7 +415,8 @@ def extract_zip_archive(zip_path: str, extract_to: str) -> List[Path]:
         return extracted_files
 
     except zipfile.BadZipFile:
-        raise DicomProcessingError("Некорректный или повреждённый ZIP-архив")
+        raise DicomProcessingError("Файл не является ZIP-архивом или повреждён")
+
     except PermissionError:
         raise DicomProcessingError("Отказ в доступе при распаковке архива")
     except Exception as e:
@@ -417,26 +426,43 @@ def extract_zip_archive(zip_path: str, extract_to: str) -> List[Path]:
 def is_likely_dicom_file(file_path: Path) -> bool:
     """Эвристическая проверка, похож ли файл на DICOM (по размеру, расширению, сигнатуре)"""
     try:
-        if not file_path.exists() or file_path.stat().st_size < 1024:
+        if not file_path.exists() or file_path.stat().st_size < 128:  # Reduced from 1024
             return False
 
         dicom_extensions = {".dcm", ".dic", ".dicom", ""}
-        if file_path.suffix.lower() not in dicom_extensions:
+        file_suffix = file_path.suffix.lower()
+
+        skip_extensions = {".txt", ".log", ".xml", ".json", ".zip", ".rar", ".exe", ".dll"}
+        if file_suffix in skip_extensions:
             return False
+
+        if file_suffix not in dicom_extensions and file_suffix != "":
+            pass
 
         with open(file_path, "rb") as f:
             header = f.read(132)
 
         if len(header) >= 132 and header[128:132] == b"DICM":
             return True
+
         if len(header) >= 4 and header[0:4] in [b"DICM", b"MEDI", b"ACR"]:
             return True
 
-        # По умолчанию — возможно DICOM (force=True в pydicom позже уточнит)
-        return True
-    except Exception:
+
+        if len(header) >= 8:
+            for i in range(0, min(64, len(header) - 4), 2):
+                if header[i:i + 2] in [b'\x02\x00', b'\x08\x00', b'\x10\x00', b'\x20\x00']:
+                    return True
+
+        if file_suffix == "":
+            return True
+
         return False
 
+    except Exception as e:
+        logger.debug(f"Error checking if {file_path} is DICOM: {e}")
+        # When in doubt, let pydicom decide later
+        return True
 
 class StudyService:
     """Сервис для CRUD-операций с исследованиями"""
