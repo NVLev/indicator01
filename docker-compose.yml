@@ -54,6 +54,22 @@ services:
     networks:
       - indicator_net
 
+  ml_service:
+    build:
+      context: .
+      dockerfile: Dockerfile.ml
+    container_name: indicator_ml
+    ports:
+      - "8501:8501"
+    volumes:
+      - ./ML_model:/app/ML_model
+      - ./processed_studies:/app/processed_studies
+    environment:
+      - MODEL_PATH=/app/ML_model/best_pathology_model.keras
+      - THRESHOLD_PATH=/app/ML_model/pathology_threshold.json
+      - PROCESSED_DIR=/app/processed_studies
+    networks:
+      - indicator_net
 
   redis:
     image: redis:7-alpine

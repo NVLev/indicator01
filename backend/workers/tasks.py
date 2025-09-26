@@ -241,7 +241,7 @@ def _run_ml_inference_fast(organized_path: str, study_id: int) -> Dict:
             "processing_status": "failed",
             "error_message": str(e)
         }
-    ml_time = time.time() - start_time
+    # ml_time = time.time() - start_time
 
 
 

@@ -24,19 +24,18 @@ indicator01/
 │   │   │   ├── tasks.py          # Задачи Celery
 │   │   │   └── worker.py         # Настройки Celery
 │   │   │
-│   ├── requirements_backend.txt  # Зависимости бэкенда
-│   ├── ML_model/               # Код для использования обученных моделей
-│   │   │   ├── heatmap.py    
-│   │   │   ├── Inference.py 
-│   │   │   ├── ML_model.py       
-│   │   │   └── Inference_with_heatmap.py         
+│   └──requirements_backend.txt  # Зависимости бэкенда
 │  
-│   
+├── ML_model/               # Код для использования обученных моделей
+│   ├── heatmap.py    
+│   ├── Inference.py 
+│   ├── ML_model.py       
+│   └── Inference_with_heatmap.py  
 │
 ├── inference/                   
 │
 ├── Dockerfile                # Контейнеризация бэкенда
 ├── docker-compose.yml            # Оркестрация сервисов
-├── requirements_bareaking.txt              # Общие зависимости (training + inference)
+├── requirements.txt              # Общие зависимости (training + inference)
 └── README.md                     # Документация
 ```
