@@ -65,6 +65,7 @@ def process_complete_study_task(self, zip_file_path: str, study_id: int, output_
         "most_dangerous_pathology_type": "",
         "pathology_localization_coords": None,
         "ml_inference_time": 0.0,
+        "needs_review": False,
     }
 
     try:
@@ -111,6 +112,7 @@ def process_complete_study_task(self, zip_file_path: str, study_id: int, output_
 
         ml_time = _check_time_and_update_progress(90, "ИИ анализ завершен")
         processing_result["ml_inference_time"] = ml_time - dicom_time
+        logger.info(f"Результаты ML для исследования {study_id}: {processing_result}")
 
         # === ЭТАП 3: ФИНАЛИЗАЦИЯ ===
         update_study_results_sync(study_id, processing_result)
@@ -129,7 +131,7 @@ def process_complete_study_task(self, zip_file_path: str, study_id: int, output_
                 "within_limit": total_time <= 10 * 60
             }
         )
-
+        logger.info(f"Статус исследования {study_id} обновлен в БД")
         return processing_result
 
     except SoftTimeLimitExceeded:
@@ -189,25 +191,43 @@ def _run_ml_inference_fast(organized_path: str, study_id: int) -> Dict:
         ml_results = ml_service.analyze_study(organized_path, study_id)
 
         # Верификация результатов (особенно для "норма")
+
+        base_result = {
+            "inference_completed": True,  # Key addition
+            "probability_of_pathology": ml_results["probability_of_pathology"],
+            "pathology": ml_results["pathology"],
+            "most_dangerous_pathology_type": "пневмония" if ml_results["pathology"] else "",
+            "pathology_localization_coords": None,  # Will be updated below if needed
+            "heatmap_path": ml_results.get("heatmap_path", ""),
+            "heatmap_format": ml_results.get("heatmap_format", ""),
+            "heatmap_metadata": {
+                "statistics": ml_results.get("heatmap_statistics", {}),
+                "max_slice": ml_results.get("max_error_slice_index", 0),
+                "verification": None
+            },
+            "processing_status": "completed",
+            "needs_review": False,
+            "needs_verification": False,
+        }
         verification_results = None
-        if ml_results.get("pathology") == 0:  # Если модель сказала "норма"
+        if ml_results.get("pathology") == 0:
             heatmap_data = ml_results.get("heatmap_data", {})
             verification_results = verification_engine.validate_normal_prediction(
                 heatmap_data, study_id
             )
 
-            # Если верификация показала проблемы - меняем статус
+            base_result["heatmap_metadata"]["verification"] = verification_results
+
             if not verification_results.get("достоверно", True):
-                ml_results["processing_status"] = "needs_review"
-                ml_results["verification_warnings"] = verification_results.get("предупреждения", [])
+                base_result["processing_status"] = "needs_review"
+                base_result["needs_review"] = True
+                base_result["verification_warnings"] = verification_results.get("предупреждения", [])
 
         # Локализация патологии из heatmap
-        localization = None
         if ml_results.get("pathology") == 1 and ml_results.get("heatmap_statistics"):
             stats = ml_results["heatmap_statistics"]
-            # Простая логика локализации - можно улучшить
-            if stats.get("max_error", 0) > 0.1:  # Порог для значимой аномалии
-                localization = {
+            if stats.get("max_error", 0) > 0.1:
+                base_result["pathology_localization_coords"] = {
                     "x_min": 0.0,
                     "x_max": float(ml_results.get("heatmap_shape", [128, 128, 64])[0]),
                     "y_min": 0.0,
@@ -217,21 +237,7 @@ def _run_ml_inference_fast(organized_path: str, study_id: int) -> Dict:
                     "confidence": stats.get("max_error", 0.0)
                 }
 
-        return {
-            "probability_of_pathology": ml_results["probability_of_pathology"],
-            "pathology": ml_results["pathology"],
-            "most_dangerous_pathology_type": "пневмония" if ml_results["pathology"] else "",
-            "pathology_localization_coords": localization,
-            "heatmap_path": ml_results.get("heatmap_path", ""),
-            "heatmap_format": ml_results.get("heatmap_format", ""),
-            "heatmap_metadata": {
-                "statistics": ml_results.get("heatmap_statistics", {}),
-                "max_slice": ml_results.get("max_error_slice_index", 0),
-                "verification": verification_results
-            },
-            "processing_status": ml_results.get("processing_status", "completed"),
-            "needs_review": not verification_results.get("достоверно", True) if verification_results else False
-        }
+        return base_result
 
     except Exception as e:
         logger.error(f"Ошибка ML inference для исследования {study_id}: {e}")

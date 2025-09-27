@@ -211,8 +211,8 @@ class VerificationEngine:
                 "название_проверки": "качество_heatmap"
             }
 
-        high_attention_ratio = np.sum(heatmap > 0.8) / heatmap.size
-        if high_attention_ratio > 0.3:
+        high_attention_ratio = np.sum(heatmap > 0.95) / heatmap.size
+        if high_attention_ratio > 0.5:
             return {
                 "пройдено": False,
                 "множитель_доверия": 0.5,

@@ -230,6 +230,13 @@ async def update_study_results(
 
         metadata = results.get("study_metadata", {})
 
+        study.probability_of_pathology = results.get("probability_of_pathology", 0.0)
+        study.pathology = results.get("pathology", 0)
+        study.most_dangerous_pathology_type = results.get("most_dangerous_pathology_type", "")
+        study.pathology_localization_coords = results.get("pathology_localization_coords")
+        study.heatmap_path = results.get("heatmap_path", "")
+        study.heatmap_format = results.get("heatmap_format", "")
+        study.heatmap_metadata = results.get("heatmap_metadata")
         study.study_uid = metadata.get("StudyInstanceUID", "")
         study.series_uid = metadata.get("SeriesInstanceUID", "")
         study.path_to_study = results.get("organized_path", "") or study.path_to_study

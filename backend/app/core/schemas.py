@@ -129,9 +129,13 @@ class StudyResponse(StudyBase):
     inference_completed: bool
     created_at: datetime
     updated_at: datetime
-    needs_review: bool = Field(False, description="Требуется проверка врачом")
+    needs_verification: bool = Field(False, description="Требуется проверка врачом")
     verification_score: Optional[float] = Field(None, description="Оценка достоверности AI")
     verification_warnings: List[str] = Field([], description="Предупреждения верификации")
+
+    @property
+    def needs_review(self) -> bool:
+        return self.needs_verification
 
     @field_validator('processing_status', mode='before')
     @classmethod
