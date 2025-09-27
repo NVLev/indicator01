@@ -130,6 +130,24 @@ services:
       - indicator_net
     command: ["celery", "-A", "workers.tasks", "beat", "--loglevel=info"]
 
+  alembic:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    working_dir: /app/backend
+    environment:
+      - APP_CONFIG__DB__URL=postgresql+asyncpg://user:password@pg:5432/indicator
+      - PYTHONPATH=/app/backend
+    volumes:
+      - ./backend:/app/backend
+    depends_on:
+      pg:
+        condition: service_healthy
+    networks:
+      - indicator_net
+    profiles: [ "migrations" ]
+    command: [ "alembic", "upgrade", "head" ]
+
   flower:
     build:
       context: .
