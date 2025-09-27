@@ -612,6 +612,13 @@ def create_excel_report(processing_results: List[Dict[str, Any]], output_path: s
 
     for result in processing_results:
         study_metadata = result.get("study_metadata", {})
+        raw_status = result.get("processing_status", "Failure")
+        if str(raw_status).lower() in {"completed", "success", "ok"}:
+            status_str = "Success"
+        elif str(raw_status).lower() in {"needsreview", "needs_review", "требует_проверки"}:
+            status_str = "NeedsReview"
+        else:
+            status_str = "Failure"
 
         raw_status = result.get("processing_status", "Failure")
         if str(raw_status).lower() in {"completed", "success", "ok"}:

@@ -337,12 +337,18 @@ async def export_study_excel(
     if not study:
         raise HTTPException(status_code=404, detail="Исследование не найдено")
 
-    if study.processing_status != StudyStatus.COMPLETED:
+    allowed_statuses = [StudyStatus.COMPLETED, StudyStatus.NEEDS_REVIEW]
+    if study.processing_status not in allowed_statuses:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Исследование еще не обработано"
         )
 
+    if not study.inference_completed:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="ML анализ исследования не завершен"
+        )
     try:
         # Подготавливаем данные для отчета
         study_data = {
