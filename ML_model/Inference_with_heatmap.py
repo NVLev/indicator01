@@ -118,20 +118,59 @@ class CTInferenceProcessor:
             # Нормализация к диапазону [0, 1]
             image_array = (image_array - (-1000)) / (400 - (-1000))
 
-            # Ресемплинг к целевому размеру
-            zoom_factors = [
-                self.target_size[0] / image_array.shape[0],
-                self.target_size[1] / image_array.shape[1],
-                self.target_size[2] / image_array.shape[2]
-            ]
-            image_array_resized = zoom(image_array, zoom_factors, order=1)
+            # ДИАГНОСТИКА: проверяем размерность
+            print(f"🔍 Размерность данных: {image_array.ndim}D")
+            print(f"🔍 Форма данных: {image_array.shape}")
+
+            # АДАПТИВНЫЙ РЕСЕМПЛИНГ: обрабатываем как 3D или 4D данные
+            if image_array.ndim == 3:
+                # Стандартный случай: 3D томограмма (depth, height, width)
+                zoom_factors = [
+                    self.target_size[0] / image_array.shape[0],
+                    self.target_size[1] / image_array.shape[1],
+                    self.target_size[2] / image_array.shape[2]
+                ]
+                image_array_resized = zoom(image_array, zoom_factors, order=1)
+
+            elif image_array.ndim == 4:
+                # Случай с каналами: (depth, height, width, channels)
+                print("⚠️ Обнаружены 4D данные с каналами")
+
+                # Вариант 1: Убираем ось каналов если она равна 1
+                if image_array.shape[3] == 1:
+                    image_array = np.squeeze(image_array, axis=3)
+                    zoom_factors = [
+                        self.target_size[0] / image_array.shape[0],
+                        self.target_size[1] / image_array.shape[1],
+                        self.target_size[2] / image_array.shape[2]
+                    ]
+                    image_array_resized = zoom(image_array, zoom_factors, order=1)
+                else:
+                    # Вариант 2: Ресемплинг с сохранением каналов
+                    zoom_factors = [
+                        self.target_size[0] / image_array.shape[0],
+                        self.target_size[1] / image_array.shape[1],
+                        self.target_size[2] / image_array.shape[2],
+                        1  # Каналы не изменяем
+                    ]
+                    image_array_resized = zoom(image_array, zoom_factors, order=1)
+
+            else:
+                raise ValueError(f"Неожиданная размерность данных: {image_array.ndim}")
 
             print(f"📏 Размер после ресемплинга: {image_array_resized.shape}")
-            image_array_resized = np.expand_dims(image_array_resized, axis=-1)
+
+            # Добавляем ось каналов если её нет
+            if image_array_resized.ndim == 3:
+                image_array_resized = np.expand_dims(image_array_resized, axis=-1)
+
+            print(f"🎯 Финальный размер: {image_array_resized.shape}")
             return image_array_resized
 
         except Exception as e:
             print(f"❌ Ошибка препроцессинга: {e}")
+            import traceback
+            print(f"🔍 Детали ошибки: {traceback.format_exc()}")
             return None
 
     def calculate_reconstruction_error_with_heatmap(self, volume):
