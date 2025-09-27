@@ -350,23 +350,83 @@ def group_files_by_series(file_paths: List[Path]) -> Dict[str, List[Path]]:
 
 
 def organize_dicom_files(series_groups: Dict[str, List[Path]], output_dir: str, study_uid: str) -> str:
-    """Копируем/организуем DICOM-файлы в структуру output_dir/<study_uid>/<series_uid>"""
-    study_dir = Path(output_dir) / study_uid
+    """Копируем DICOM-файлы в плоскую структуру (все файлы в корне исследования)"""
+
+    base_dir = Path("/app/processed_studies")
+    study_dir = base_dir / study_uid
     study_dir.mkdir(parents=True, exist_ok=True)
 
+    logger.info(f"📁 Создание плоской структуры в: {study_dir}")
+
+    total_files = 0
+    file_counter = 0
+
+    # Собираем все файлы из всех серий
+    all_files = []
     for series_uid, files in series_groups.items():
-        series_dir = study_dir / series_uid
-        series_dir.mkdir(exist_ok=True)
-        for i, file_path in enumerate(files):
-            try:
-                new_filename = f"{series_uid}_{i:04d}.dcm"
-                new_path = series_dir / new_filename
-                shutil.copy2(file_path, new_path)
-            except Exception as e:
-                logger.warning(f"Ошибка при копировании {file_path}: {e}")
+        all_files.extend(files)
+
+    # Копируем все файлы в корень директории исследования с простыми именами
+    for file_path in all_files:
+        try:
+            # Создаем простое имя файла
+            new_filename = f"image_{file_counter:05d}.dcm"
+            new_path = study_dir / new_filename
+            shutil.copy2(file_path, new_path)
+
+            # Проверяем, что файл скопировался
+            if new_path.exists():
+                total_files += 1
+                file_counter += 1
+                logger.debug(f"✅ Скопирован: {file_path.name} -> {new_path.name}")
+            else:
+                logger.error(f"❌ Файл не скопировался: {file_path}")
+
+        except Exception as e:
+            logger.error(f"❌ Ошибка копирования {file_path}: {e}")
+
+    logger.info(f"✅ Успешно скопировано {total_files} файлов в плоскую структуру")
+
+    # Проверяем результат
+    dcm_files = list(study_dir.glob("*.dcm"))
+    logger.info(f"🔍 Проверка: в {study_dir} найдено {len(dcm_files)} .dcm файлов")
+
+    if len(dcm_files) == 0:
+        logger.error("❌ КРИТИЧЕСКАЯ ОШИБКА: Файлы не скопировались в плоскую структуру!")
+        # Попробуем альтернативный метод с сохранением оригинальных имен
+        return organize_with_original_names(series_groups, study_dir, study_uid)
 
     return str(study_dir)
 
+
+def organize_with_original_names(series_groups: Dict[str, List[Path]], study_dir: Path, study_uid: str) -> str:
+    """Альтернативный метод: копируем с оригинальными именами файлов"""
+
+    logger.info("🔄 Попытка копирования с оригинальными именами")
+
+    total_files = 0
+
+    # Копируем все файлы, сохраняя оригинальные имена
+    for series_uid, files in series_groups.items():
+        for i, file_path in enumerate(files):
+            try:
+                # Используем оригинальное имя файла
+                original_name = file_path.name
+                new_path = study_dir / original_name
+
+                # Если файл с таким именем уже существует, добавляем суффикс
+                if new_path.exists():
+                    new_path = study_dir / f"{i:04d}_{original_name}"
+
+                shutil.copy2(file_path, new_path)
+                total_files += 1
+                logger.debug(f"✅ Скопирован с оригинальным именем: {original_name}")
+
+            except Exception as e:
+                logger.error(f"❌ Ошибка копирования {file_path}: {e}")
+
+    logger.info(f"✅ Скопировано {total_files} файлов с оригинальными именами")
+    return str(study_dir)
 
 def extract_zip_archive(zip_path: str, extract_to: str) -> List[Path]:
     """

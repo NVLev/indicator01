@@ -3,7 +3,9 @@ import requests
 import numpy as np
 import json
 from pathlib import Path
+import logging
 
+logger = logging.getLogger(__name__)
 
 class MLInferenceService:
     """
@@ -14,6 +16,7 @@ class MLInferenceService:
     def __init__(self, service_url: str = None):
         # URL сервиса ML (имя контейнера из docker-compose.yml)
         self.service_url = service_url or os.getenv("ML_SERVICE_URL", "http://ml_service:8501")
+        self.processed_dir = os.getenv("PROCESSED_DIR", "/app/processed_studies")
 
     def analyze_study(self, organized_study_path: str, study_id: int) -> dict:
         """
@@ -26,6 +29,37 @@ class MLInferenceService:
         Returns:
             dict: результат работы ML сервиса (с форматированием)
         """
+        study_path = Path(organized_study_path)
+
+        if study_path.is_absolute():
+            final_path = study_path
+        else:
+            # Если путь относительный, проверяем не начинается ли он уже с processed_studies
+            if organized_study_path.startswith("processed_studies/"):
+                # Убираем лишнюю часть пути
+                relative_path = organized_study_path.replace("processed_studies/", "", 1)
+                final_path = Path(self.processed_dir) / relative_path
+            else:
+                final_path = Path(self.processed_dir) / organized_study_path
+
+            # Убедимся, что путь существует
+        if not final_path.exists():
+            logger.error(f"Путь к исследованию не существует: {final_path}")
+            logger.error(f"Исходный путь: {organized_study_path}")
+            logger.error(f"Базовая директория: {self.processed_dir}")
+
+            # Попробуем найти файлы вручную
+            try:
+                possible_paths = list(Path(self.processed_dir).rglob("*"))
+                logger.info(f"🔍 Доступные пути в {self.processed_dir}: {[str(p) for p in possible_paths[:10]]}")
+            except Exception as e:
+                logger.error(f"Не удалось просканировать директорию: {e}")
+            return {
+                "processing_status": "failed",
+                "error_message": f"Study path not found: {study_path}",
+                "probability_of_pathology": 0.0,
+                "pathology": 0,
+            }
         payload = {
             "study_path": organized_study_path,
             "study_id": study_id,
