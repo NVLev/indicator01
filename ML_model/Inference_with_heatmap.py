@@ -82,26 +82,50 @@ class CTInferenceProcessor:
 
             print(f"📁 Найдено {len(files)} файлов в {directory_path}")
 
+            # ДИАГНОСТИКА: анализируем тип файлов
             dicom_files = []
+            non_dicom_files = []
+
             for file_path in files:
                 if self.is_dicom_file(str(file_path)):
                     dicom_files.append(str(file_path))
+                else:
+                    non_dicom_files.append(str(file_path))
+
+            print(f"🔍 DICOM файлов: {len(dicom_files)}, не-DICOM: {len(non_dicom_files)}")
 
             if not dicom_files:
                 print("⚠ Не найдено DICOM файлов по сигнатуре, пробуем загрузить все файлы...")
                 dicom_files = [str(f) for f in files]
 
-            print(f"🔍 Загружаем {len(dicom_files)} файлов как DICOM")
             dicom_files.sort()
+
+            # ДИАГНОСТИКА: информация о первом файле
+            if dicom_files:
+                first_file = dicom_files[0]
+                try:
+                    ds = pydicom.dcmread(first_file, stop_before_pixels=True)
+                    print(f"📄 Первый файл: {Path(first_file).name}")
+                    print(f"   Modality: {getattr(ds, 'Modality', 'Unknown')}")
+                    print(f"   Size: {getattr(ds, 'Rows', '?')}x{getattr(ds, 'Columns', '?')}")
+                    print(f"   Slice location: {getattr(ds, 'SliceLocation', 'Unknown')}")
+                except Exception as e:
+                    print(f"⚠ Ошибка чтения первого файла: {e}")
 
             reader = sitk.ImageSeriesReader()
             reader.SetFileNames(dicom_files)
             image = reader.Execute()
-            print(f"✓ Успешно загружено изображение размером {image.GetSize()}")
+
+            size = image.GetSize()
+            dimension = image.GetDimension()
+            print(f"✓ Успешно загружено {dimension}D изображение размером {size}")
+
             return image
 
         except Exception as e:
             print(f"❌ Ошибка загрузки DICOM из {directory_path}: {e}")
+            import traceback
+            print(f"🔍 Детали ошибки: {traceback.format_exc()}")
             return None
 
     def preprocess_image(self, sitk_image):
@@ -111,60 +135,48 @@ class CTInferenceProcessor:
             image_array = image_array.astype(np.float32)
 
             print(f"📊 Исходный размер: {image_array.shape}")
+            print(f"🔍 Размерность данных: {image_array.ndim}D")
+
+            # СПЕЦИАЛЬНАЯ ОБРАБОТКА ДЛЯ ОДИНОЧНЫХ ФАЙЛОВ vs СЕРИЙ
+            if image_array.ndim == 4:
+                print("⚠️ Обнаружены 4D данные (вероятно одиночный файл или multiple series)")
+
+                # Анализируем структуру: (series, slices, height, width) или (1, slices, height, width)
+                if image_array.shape[0] == 1:
+                    # Случай: (1, slices, height, width) - убираем первую ось
+                    image_array = np.squeeze(image_array, axis=0)
+                    print(f"🔄 Убрана ось series: {image_array.shape}")
+                else:
+                    # Случай: (series, slices, height, width) - берем первую серию
+                    print(f"⚠️ Множественные серии ({image_array.shape[0]}), берем первую")
+                    image_array = image_array[0]
+                    print(f"🔄 Взята первая серия: {image_array.shape}")
+
+            # Убеждаемся, что получили 3D данные
+            if image_array.ndim != 3:
+                raise ValueError(f"После преобразования ожидалось 3D, но получилось {image_array.ndim}D")
+
+            print(f"✅ Финальная 3D форма: {image_array.shape}")
 
             # Ограничение диапазона HU
             image_array = np.clip(image_array, -1000, 400)
-
-            # Нормализация к диапазону [0, 1]
             image_array = (image_array - (-1000)) / (400 - (-1000))
 
-            # ДИАГНОСТИКА: проверяем размерность
-            print(f"🔍 Размерность данных: {image_array.ndim}D")
-            print(f"🔍 Форма данных: {image_array.shape}")
+            # Ресемплинг к целевому размеру
+            zoom_factors = [
+                self.target_size[0] / image_array.shape[0],
+                self.target_size[1] / image_array.shape[1],
+                self.target_size[2] / image_array.shape[2]
+            ]
 
-            # АДАПТИВНЫЙ РЕСЕМПЛИНГ: обрабатываем как 3D или 4D данные
-            if image_array.ndim == 3:
-                # Стандартный случай: 3D томограмма (depth, height, width)
-                zoom_factors = [
-                    self.target_size[0] / image_array.shape[0],
-                    self.target_size[1] / image_array.shape[1],
-                    self.target_size[2] / image_array.shape[2]
-                ]
-                image_array_resized = zoom(image_array, zoom_factors, order=1)
-
-            elif image_array.ndim == 4:
-                # Случай с каналами: (depth, height, width, channels)
-                print("⚠️ Обнаружены 4D данные с каналами")
-
-                # Вариант 1: Убираем ось каналов если она равна 1
-                if image_array.shape[3] == 1:
-                    image_array = np.squeeze(image_array, axis=3)
-                    zoom_factors = [
-                        self.target_size[0] / image_array.shape[0],
-                        self.target_size[1] / image_array.shape[1],
-                        self.target_size[2] / image_array.shape[2]
-                    ]
-                    image_array_resized = zoom(image_array, zoom_factors, order=1)
-                else:
-                    # Вариант 2: Ресемплинг с сохранением каналов
-                    zoom_factors = [
-                        self.target_size[0] / image_array.shape[0],
-                        self.target_size[1] / image_array.shape[1],
-                        self.target_size[2] / image_array.shape[2],
-                        1  # Каналы не изменяем
-                    ]
-                    image_array_resized = zoom(image_array, zoom_factors, order=1)
-
-            else:
-                raise ValueError(f"Неожиданная размерность данных: {image_array.ndim}")
-
+            print(f"🔍 Zoom factors: {zoom_factors}")
+            image_array_resized = zoom(image_array, zoom_factors, order=1)
             print(f"📏 Размер после ресемплинга: {image_array_resized.shape}")
 
-            # Добавляем ось каналов если её нет
-            if image_array_resized.ndim == 3:
-                image_array_resized = np.expand_dims(image_array_resized, axis=-1)
+            # Добавляем ось каналов
+            image_array_resized = np.expand_dims(image_array_resized, axis=-1)
+            print(f"🎯 Финальный размер с каналом: {image_array_resized.shape}")
 
-            print(f"🎯 Финальный размер: {image_array_resized.shape}")
             return image_array_resized
 
         except Exception as e:
