@@ -95,15 +95,20 @@ class MLInferenceService:
             "reconstruction_error": ds_result.get("reconstruction_error", 0.0),
         }
 
-        # Heatmap данные
+        # Heatmap данные - ПЕРЕДАЕМ ВСЁ СОДЕРЖИМОЕ heatmap_data
         heatmap_data = ds_result.get("heatmap_data", {})
         if heatmap_data:
+            # Сохраняем все данные из heatmap_data
             formatted.update({
                 "heatmap_statistics": heatmap_data.get("heatmap_statistics", {}),
                 "max_error_slice_index": heatmap_data.get("max_error_slice_index", 0),
                 "heatmap_shape": heatmap_data.get("error_map_shape", []),
             })
 
+            # Сохраняем ВСЕ heatmap_data для передачи в Celery
+            formatted["heatmap_data"] = heatmap_data
+
+            # Сохраняем heatmap файлы
             heatmap_path = self._save_heatmap_data(heatmap_data, study_id)
             if heatmap_path:
                 formatted["heatmap_path"] = heatmap_path
@@ -112,22 +117,44 @@ class MLInferenceService:
         return formatted
 
     def _save_heatmap_data(self, heatmap_data: dict, study_id: int) -> str:
-        """Сохраняет heatmap данные в файл"""
+        """Сохраняет heatmap данные в файл включая PNG визуализацию"""
         try:
             heatmap_dir = Path("/app/processed_studies") / f"study_{study_id}" / "heatmaps"
             heatmap_dir.mkdir(parents=True, exist_ok=True)
 
-            error_map = np.array(heatmap_data.get("error_map_3d", []))
-            if error_map.size > 0:
-                np.save(heatmap_dir / "error_map.npy", error_map)
+            # Сохраняем error_map если есть как numpy array
+            error_map_3d = heatmap_data.get("error_map_3d")
+            if error_map_3d:
+                error_map_array = np.array(error_map_3d)
+                np.save(heatmap_dir / "error_map.npy", error_map_array)
+                logger.info(f"✅ Сохранен error_map.npy с формой {error_map_array.shape}")
 
+            # Сохраняем PNG визуализацию если есть
+            visualization_png = heatmap_data.get("visualization_png")
+            if visualization_png:
+                try:
+                    import base64
+                    png_data = base64.b64decode(visualization_png)
+                    with open(heatmap_dir / "heatmap_visualization.png", "wb") as f:
+                        f.write(png_data)
+                    logger.info("✅ Сохранена PNG визуализация heatmap")
+                except Exception as e:
+                    logger.warning(f"Не удалось сохранить PNG: {e}")
+
+            # Сохраняем статистику
+            stats = heatmap_data.get("heatmap_statistics", {})
             with open(heatmap_dir / "heatmap_stats.json", "w") as f:
-                json.dump(heatmap_data.get("heatmap_statistics", {}), f)
+                json.dump({
+                    "statistics": stats,
+                    "max_error_slice_index": heatmap_data.get("max_error_slice_index", 0),
+                    "shape": heatmap_data.get("error_map_shape", [])
+                }, f, indent=2)
 
+            logger.info(f"✅ Heatmap данные сохранены в {heatmap_dir}")
             return str(heatmap_dir)
 
         except Exception as e:
-            print(f"Ошибка сохранения heatmap: {e}")
+            logger.error(f"❌ Ошибка сохранения heatmap: {e}")
             return ""
 
 

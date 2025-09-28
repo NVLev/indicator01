@@ -112,7 +112,14 @@ def process_complete_study_task(self, zip_file_path: str, study_id: int, output_
 
         ml_time = _check_time_and_update_progress(90, "ИИ анализ завершен")
         processing_result["ml_inference_time"] = ml_time - dicom_time
-        logger.info(f"Результаты ML для исследования {study_id}: {processing_result}")
+        logger.info(f"📊 Итоговые результаты исследования {study_id}:")
+        logger.info(f"   Статус: {processing_result.get('processing_status')}")
+        logger.info(f"   Вероятность патологии: {processing_result.get('probability_of_pathology')}")
+        logger.info(f"   Класс: {processing_result.get('pathology')}")
+        logger.info(f"   Heatmap присутствует: {'heatmap_data' in processing_result}")
+        if 'heatmap_data' in processing_result:
+            hd = processing_result['heatmap_data']
+            logger.info(f"   Heatmap shape: {hd.get('error_map_shape')}")
 
         # === ЭТАП 3: ФИНАЛИЗАЦИЯ ===
         update_study_results_sync(study_id, processing_result)
@@ -181,8 +188,6 @@ def _run_ml_inference_fast(organized_path: str, study_id: int) -> Dict:
     """
     Быстрый ML инференс
     """
-    import random
-
     logger.info(f"Запуск ML анализа для исследования {study_id}")
     start_time = time.time()
 
@@ -190,69 +195,107 @@ def _run_ml_inference_fast(organized_path: str, study_id: int) -> Dict:
         ml_service = get_ml_service()
         ml_results = ml_service.analyze_study(organized_path, study_id)
 
-        # Верификация результатов (особенно для "норма")
+        # ДИАГНОСТИКА: какие поля действительно возвращает ML сервис
+        logger.info(f"🔍 ML сервис вернул ключи: {list(ml_results.keys())}")
+        logger.info(f"🔍 pathology присутствует: {'pathology' in ml_results}")
+        logger.info(f"🔍 pathology_class присутствует: {'pathology_class' in ml_results}")
+        logger.info(f"📊 Результаты ML для исследования {study_id}:")
+        logger.info(f"   Статус: {ml_results.get('processing_status')}")
+        logger.info(f"   Вероятность патологии: {ml_results.get('probability_of_pathology')}")
+        logger.info(f"   Класс: {ml_results.get('pathology')}")
+        has_heatmap = any(key.startswith('heatmap') for key in ml_results.keys())
+        logger.info(f"   Heatmap поля присутствуют: {has_heatmap}")
 
+        heatmap_data = ml_results.get("heatmap_data", {})
+        heatmap_statistics = ml_results.get("heatmap_statistics", heatmap_data.get("heatmap_statistics", {}))
+        max_error_slice_index = ml_results.get("max_error_slice_index", heatmap_data.get("max_error_slice_index", 0))
+        heatmap_shape = ml_results.get("heatmap_shape", heatmap_data.get("error_map_shape", [128, 128, 64]))
+
+        if heatmap_data:
+            logger.info(f"   Heatmap shape: {heatmap_data.get('error_map_shape')}")
+            logger.info(f"   Heatmap statistics: {heatmap_data.get('heatmap_statistics', {})}")
+            logger.info(f"   PNG визуализация доступна: {heatmap_data.get('visualization_png') is not None}")
+        else:
+            logger.warning("⚠️ heatmap_data отсутствует в результатах ML")
+
+        # Верификация результатов
         base_result = {
-            "inference_completed": True,  # Key addition
-            "probability_of_pathology": ml_results["probability_of_pathology"],
-            "pathology": ml_results["pathology"],
-            "most_dangerous_pathology_type": "пневмония" if ml_results["pathology"] else "",
-            "pathology_localization_coords": None,  # Will be updated below if needed
+            "inference_completed": True,
+            "probability_of_pathology": ml_results.get("probability_of_pathology", 0.0),
+            "pathology": ml_results.get("pathology", 0),
+            "most_dangerous_pathology_type": "пневмония" if ml_results.get("pathology", 0) == 1 else "",
+            "pathology_localization_coords": None,
             "heatmap_path": ml_results.get("heatmap_path", ""),
             "heatmap_format": ml_results.get("heatmap_format", ""),
             "heatmap_metadata": {
-                "statistics": ml_results.get("heatmap_statistics", {}),
-                "max_slice": ml_results.get("max_error_slice_index", 0),
+                "statistics": heatmap_statistics,
+                "max_slice": max_error_slice_index,
+                "shape": heatmap_shape,
                 "verification": None
             },
+            "heatmap_data": heatmap_data,  # Всегда dict, даже если пустой
             "processing_status": "completed",
             "needs_review": False,
             "needs_verification": False,
+            "ml_processing_time": ml_results.get("ml_processing_time", 0.0),
+            "reconstruction_error": ml_results.get("reconstruction_error", 0.0),
         }
+
         verification_results = None
-        if ml_results.get("pathology") == 0:
-            heatmap_data = ml_results.get("heatmap_data", {})
-            verification_results = verification_engine.validate_normal_prediction(
-                heatmap_data, study_id
-            )
+        if ml_results.get("pathology", 0) == 0 and heatmap_data:
+            try:
+                verification_results = verification_engine.validate_normal_prediction(
+                    heatmap_data, study_id
+                )
 
-            base_result["heatmap_metadata"]["verification"] = verification_results
+                base_result["heatmap_metadata"]["verification"] = verification_results
 
-            if not verification_results.get("достоверно", True):
-                base_result["processing_status"] = "needs_review"
-                base_result["needs_review"] = True
-                base_result["verification_warnings"] = verification_results.get("предупреждения", [])
+                if not verification_results.get("достоверно", True):
+                    base_result["processing_status"] = "needs_review"
+                    base_result["needs_review"] = True
+                    base_result["verification_warnings"] = verification_results.get("предупреждения", [])
+
+            except Exception as verification_error:
+                logger.warning(f"Ошибка верификации для исследования {study_id}: {verification_error}")
+                base_result["verification_error"] = str(verification_error)
 
         # Локализация патологии из heatmap
-        if ml_results.get("pathology") == 1 and ml_results.get("heatmap_statistics"):
-            stats = ml_results["heatmap_statistics"]
-            if stats.get("max_error", 0) > 0.1:
+        if (ml_results.get("pathology", 0) == 1 and
+                heatmap_statistics and
+                heatmap_statistics.get("max_error", 0) > 0.1):
+
+            try:
                 base_result["pathology_localization_coords"] = {
                     "x_min": 0.0,
-                    "x_max": float(ml_results.get("heatmap_shape", [128, 128, 64])[0]),
+                    "x_max": float(heatmap_shape[0] if len(heatmap_shape) > 0 else 128),
                     "y_min": 0.0,
-                    "y_max": float(ml_results.get("heatmap_shape", [128, 128, 64])[1]),
-                    "z_min": float(ml_results.get("max_error_slice_index", 0)),
-                    "z_max": float(ml_results.get("max_error_slice_index", 0) + 1),
-                    "confidence": stats.get("max_error", 0.0)
+                    "y_max": float(heatmap_shape[1] if len(heatmap_shape) > 1 else 128),
+                    "z_min": float(max_error_slice_index),
+                    "z_max": float(max_error_slice_index + 1),
+                    "confidence": heatmap_statistics.get("max_error", 0.0)
                 }
+                logger.info(f"📍 Локализация патологии установлена для среза {max_error_slice_index}")
+            except Exception as loc_error:
+                logger.warning(f"Ошибка установки локализации: {loc_error}")
+
+        # ФИНАЛЬНАЯ ДИАГНОСТИКА
+        logger.info(f"✅ Итоговые данные для исследования {study_id}:")
+        logger.info(f"   Статус: {base_result['processing_status']}")
+        logger.info(f"   Heatmap_data тип: {type(base_result['heatmap_data'])}")
+        logger.info(
+            f"   Heatmap_data ключи: {list(base_result['heatmap_data'].keys()) if base_result['heatmap_data'] else 'пусто'}")
+        logger.info(f"   Нужна проверка: {base_result['needs_review']}")
 
         return base_result
-
     except Exception as e:
         logger.error(f"Ошибка ML inference для исследования {study_id}: {e}")
         return {
             "probability_of_pathology": 0.0,
             "pathology": 0,
             "processing_status": "failed",
-            "error_message": str(e)
+            "error_message": str(e),
+            "heatmap_data": {}
         }
-    # ml_time = time.time() - start_time
-
-
-
-
-
 
 @celery_app.task(name="cleanup_old_files_task")
 def cleanup_old_files_task(days_old: int = 7):

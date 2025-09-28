@@ -1,6 +1,6 @@
 import json
 from enum import Enum
-from pydantic import BaseModel, EmailStr, Field, field_validator, ConfigDict
+from pydantic import BaseModel, EmailStr, Field, field_validator, ConfigDict, computed_field
 from datetime import datetime
 from typing import List, Optional, Dict, Any, Union
 from enum import Enum
@@ -133,9 +133,26 @@ class StudyResponse(StudyBase):
     verification_score: Optional[float] = Field(None, description="Оценка достоверности AI")
     verification_warnings: List[str] = Field([], description="Предупреждения верификации")
 
+
+    @computed_field(description="Информация о heatmap данных")
+    @property
+    def heatmap_data_info(self) -> Optional[Dict]:
+        if self.heatmap_metadata and isinstance(self.heatmap_metadata, dict):
+            return self.heatmap_metadata.get('heatmap_data_info')
+        return None
+
+    @computed_field(description="Статистика heatmap")
+    @property
+    def heatmap_statistics(self) -> Optional[Dict]:
+        if self.heatmap_metadata and isinstance(self.heatmap_metadata, dict):
+            return self.heatmap_metadata.get('heatmap_statistics')
+        return None
+
+    @computed_field(description="Требуется проверка врачом")
     @property
     def needs_review(self) -> bool:
         return self.needs_verification
+
 
     @field_validator('processing_status', mode='before')
     @classmethod
@@ -172,7 +189,6 @@ class StudyResponse(StudyBase):
         if v is None:
             return None
         return v.isoformat() if hasattr(v, 'isoformat') else v
-
 
 class StudyListResponse(BaseModel):
     """Схема для списка исследований с пагинацией"""

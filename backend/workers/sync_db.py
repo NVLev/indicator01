@@ -59,6 +59,21 @@ def update_study_results_sync(study_id: int, results: dict):
             russian_status = status_mapping.get(raw_status, 'ошибка')
 
             # Подготавливаем данные для обновления
+            heatmap_metadata_data = {
+                # Существующие данные из heatmap_metadata
+                "statistics": results.get("heatmap_metadata", {}).get("statistics", {}),
+                "verification": results.get("heatmap_metadata", {}).get("verification"),
+                "max_slice": results.get("heatmap_metadata", {}).get("max_slice", 0),
+
+                # ДОБАВЛЯЕМ ДАННЫЕ ИЗ HEATMAP_DATA
+                "heatmap_data_info": {
+                    "present": bool(results.get("heatmap_data")),
+                    "error_map_shape": results.get("heatmap_data", {}).get("error_map_shape", []),
+                    "max_error_slice_index": results.get("heatmap_data", {}).get("max_error_slice_index", 0),
+                    "has_visualization": bool(results.get("heatmap_data", {}).get("visualization_png")),
+                },
+                "heatmap_statistics": results.get("heatmap_data", {}).get("heatmap_statistics", {})
+            }
             update_data = {
                 "study_uid": metadata.get("StudyInstanceUID", ""),
                 "series_uid": metadata.get("SeriesInstanceUID", ""),
@@ -72,8 +87,7 @@ def update_study_results_sync(study_id: int, results: dict):
                     "pathology_localization_coords") else None,
                 "heatmap_path": results.get("heatmap_path", ""),
                 "heatmap_format": results.get("heatmap_format", ""),
-                "heatmap_metadata": json.dumps(results.get("heatmap_metadata")) if results.get(
-                    "heatmap_metadata") else None,
+                "heatmap_metadata": json.dumps(heatmap_metadata_data),
                 "time_of_processing": results.get("processing_time", 0.0),
                 "total_instances": results.get("total_instances", 0),
                 "series_count": results.get("series_count", 0),

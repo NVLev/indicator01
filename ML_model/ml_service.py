@@ -138,6 +138,18 @@ async def predict(req: PredictRequest):
             try:
                 logger.info(f"🔬 Запуск анализа для исследования {study_id}")
                 result = processor.process_study_folder(str(p), study_id)
+                logger.info(f"✅ process_study_folder завершен для исследования {study_id}")
+                logger.info(f"   📊 Статус: {result.get('processing_status')}")
+                logger.info(f"   📈 Вероятность: {result.get('probability_of_pathology', 0):.3f}")
+                logger.info(f"   🏥 Класс: {result.get('pathology_class', 0)}")
+
+                logger.info(f"   🏥 Класс: {result.get('pathology_class', 0)}")
+                if 'heatmap_data' in result:
+                    hd = result['heatmap_data']
+                    logger.info(f"   🔥 Heatmap: shape={hd.get('error_map_shape')}")
+                    logger.info(f"   📐 Статистика: max={hd.get('heatmap_statistics', {}).get('max_error', 0):.4f}")
+                else:
+                    logger.warning("❌ heatmap_data отсутствует в результате process_study_folder")
                 logger.info(f"Анализ завершен для исследования {study_id}")
                 return result
             except Exception as e:
@@ -147,13 +159,30 @@ async def predict(req: PredictRequest):
 
     try:
         result = await asyncio.to_thread(_run)
+
+        logger.info(f"📦 ML сервис вернул результат для исследования {study_id}")
+        logger.info(f"   📊 Статус: {result.get('processing_status')}")
+        logger.info(f"   📈 Вероятность: {result.get('probability_of_pathology', 0):.3f}")
+        if 'heatmap_data' in result:
+            heatmap_data = result['heatmap_data']
+            if heatmap_data:
+                logger.info(f"🔥 heatmap_data получен: shape={heatmap_data.get('error_map_shape')}")
+                logger.info(f"📐 error_map_shape: {heatmap_data.get('error_map_shape')}")
+                logger.info(f"📈 heatmap_statistics: {heatmap_data.get('heatmap_statistics', {})}")
+                logger.info(f"🖼️ PNG доступен: {heatmap_data.get('visualization_png') is not None}")
+            else:
+                logger.warning("❌ heatmap_data присутствует но пустой")
+        else:
+            logger.error("❌ heatmap_data ОТСУТСТВУЕТ в ответе ML сервиса!")
+
         if result.get("processing_status") == "Success":
-            logger.info(f"Исследование {study_id} успешно обработано")
+            logger.info(f"✅ Исследование {study_id} успешно обработано")
             probability = result.get('probability_of_pathology', 0)
-            logger.info(f"📈 Вероятность патологии: {probability:.3f}")
+            pathology = result.get('pathology_class', 0)
+            logger.info(f"📈 Вероятность патологии: {probability:.3f}, Класс: {pathology}")
         else:
             error_msg = result.get('error_message', 'Неизвестная ошибка')
-            logger.warning(f"Проблемы при обработке исследования {study_id}: {error_msg}")
+            logger.warning(f"⚠️ Проблемы при обработке исследования {study_id}: {error_msg}")
 
         return result
 
