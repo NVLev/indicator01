@@ -360,10 +360,14 @@ async def export_study_excel(
                 "StudyInstanceUID": study.study_uid or "",
                 "SeriesInstanceUID": study.series_uid or "",
             },
-            "processing_status": "Success",
+            "processing_status": "Success" if study.processing_status in ["completed",
+                                                                          "обработано"] else "Needs Review",
             "processing_time": study.time_of_processing or 0.0,
             "probability_of_pathology": study.probability_of_pathology or 0.0,
             "pathology": study.pathology or 0,
+            # ДОБАВЬТЕ ЭТИ ПОЛЯ:
+            "most_dangerous_pathology_type": study.most_dangerous_pathology_type or "",
+            "pathology_localization_coords": study.pathology_localization_coords or None
         }
 
         # Создаем временный файл

@@ -219,11 +219,13 @@ def _run_ml_inference_fast(organized_path: str, study_id: int) -> Dict:
             logger.warning("⚠️ heatmap_data отсутствует в результатах ML")
 
         # Верификация результатов
+        if ml_results.get("pathology") == 1:
+            pathology_type = "подозрение на патологию"
         base_result = {
             "inference_completed": True,
             "probability_of_pathology": ml_results.get("probability_of_pathology", 0.0),
             "pathology": ml_results.get("pathology", 0),
-            "most_dangerous_pathology_type": "пневмония" if ml_results.get("pathology", 0) == 1 else "",
+            "most_dangerous_pathology_type": pathology_type,
             "pathology_localization_coords": None,
             "heatmap_path": ml_results.get("heatmap_path", ""),
             "heatmap_format": ml_results.get("heatmap_format", ""),

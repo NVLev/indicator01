@@ -606,47 +606,142 @@ class StudyService:
 
 
 def create_excel_report(processing_results: List[Dict[str, Any]], output_path: str) -> str:
-    """Формирует Excel-отчет в формате, описанном в ТЗ."""
+    """Формирует улучшенный Excel-отчет в формате ТЗ с форматированием."""
+    import pandas as pd
+    from openpyxl import load_workbook
+    from openpyxl.styles import Font, PatternFill, Border, Side, Alignment
+    from openpyxl.utils.dataframe import dataframe_to_rows
+    from datetime import datetime
 
     report_data = []
 
     for result in processing_results:
         study_metadata = result.get("study_metadata", {})
+
         raw_status = result.get("processing_status", "Failure")
-        if str(raw_status).lower() in {"completed", "success", "ok"}:
+        if str(raw_status).lower() in {"completed", "success", "ok", "обработано"}:
             status_str = "Success"
         elif str(raw_status).lower() in {"needsreview", "needs_review", "требует_проверки"}:
-            status_str = "NeedsReview"
+            status_str = "Needs Review"
         else:
             status_str = "Failure"
 
-        raw_status = result.get("processing_status", "Failure")
-        if str(raw_status).lower() in {"completed", "success", "ok"}:
-            status_str = "Success"
-        else:
-            status_str = "Failure"
+        pathology_type = result.get("most_dangerous_pathology_type", "")
+        if not pathology_type and result.get("pathology", 0) == 1:
+            pathology_type = "Патология обнаружена"
 
-        # Базовые обязательные поля
-        row = {"path_to_study": result.get("organized_path", ""),
-               "study_uid": study_metadata.get("StudyInstanceUID", ""),
-               "series_uid": study_metadata.get("SeriesInstanceUID", ""),
-               "probability_of_pathology": result.get("probability_of_pathology", 0.0),
-               "pathology": result.get("pathology", 0), "processing_status": status_str,
-               "time_of_processing": result.get("processing_time", 0.0),
-               "most_dangerous_pathology_type": result.get("most_dangerous_pathology_type", "")}
-
-        # Опциональные поля
-        # Если локализация есть как dict → превращаем в строку "x_min,x_max,y_min,y_max,z_min,z_max"
-        loc = result.get("pathology_localization")
+        row = {
+            "path_to_study": result.get("organized_path", ""),
+            "study_uid": study_metadata.get("StudyInstanceUID", ""),
+            "series_uid": study_metadata.get("SeriesInstanceUID", ""),
+            "probability_of_pathology": round(result.get("probability_of_pathology", 0.0), 4),
+            "pathology": result.get("pathology", 0),
+            "processing_status": status_str,
+            "time_of_processing": round(result.get("processing_time", 0.0), 2),
+            "most_dangerous_pathology_type": pathology_type,
+            "pathology_localization": "",
+            "generation_date": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        }
+        loc = result.get("pathology_localization_coords")
         if isinstance(loc, dict):
-            coords = [str(loc.get(k, "")) for k in ["x_min", "x_max", "y_min", "y_max", "z_min", "z_max"]]
+            # Извлекаем координаты в правильном порядке
+            coords = [
+                str(loc.get("x_min", "")),
+                str(loc.get("x_max", "")),
+                str(loc.get("y_min", "")),
+                str(loc.get("y_max", "")),
+                str(loc.get("z_min", "")),
+                str(loc.get("z_max", ""))
+            ]
             row["pathology_localization"] = ",".join(coords)
+            print(f"Локализация добавлена: {row['pathology_localization']}")  # Для отладки
         else:
-            row["pathology_localization"] = ""
+            print(f"Локализация не найдена или неверный формат: {loc}")
+
 
         report_data.append(row)
 
+
     df = pd.DataFrame(report_data)
-    df.to_excel(output_path, index=False)
+
+
+    column_names = {
+        "path_to_study": "path_to_study",
+        "study_uid": "study_uid",
+        "series_uid": "series_uid",
+        "probability_of_pathology": "probability_of_pathology",
+        "pathology": "pathology",
+        "processing_status": "processing_status",
+        "time_of_processing": "time_of_processing",
+        "most_dangerous_pathology_type": "most_dangerous_pathology_type",
+        "pathology_localization": "pathology_localization",
+        "generation_date": "generation_date"
+    }
+
+    df = df.rename(columns=column_names)
+
+    df.to_excel(output_path, index=False, engine='openpyxl')
+
+    wb = load_workbook(output_path)
+    ws = wb.active
+
+    header_font = Font(bold=True, color="FFFFFF")
+    header_fill = PatternFill(start_color="366092", end_color="366092", fill_type="solid")
+    border = Border(
+        left=Side(style='thin'),
+        right=Side(style='thin'),
+        top=Side(style='thin'),
+        bottom=Side(style='thin')
+    )
+
+    for cell in ws[1]:
+        cell.font = header_font
+        cell.fill = header_fill
+        cell.alignment = Alignment(horizontal="center", vertical="center")
+        cell.border = border
+
+    for row in ws.iter_rows(min_row=2, max_row=ws.max_row, min_col=1, max_col=ws.max_column):
+        for cell in row:
+            cell.border = border
+            cell.alignment = Alignment(vertical="center")
+
+            if cell.column == 5:
+                if cell.value == 1:
+                    cell.fill = PatternFill(start_color="FFE6E6", end_color="FFE6E6", fill_type="solid")
+                else:
+                    cell.fill = PatternFill(start_color="E6F7E6", end_color="E6F7E6", fill_type="solid")
+
+            elif cell.column == 4:
+                if isinstance(cell.value, (int, float)) and cell.value > 0.5:
+                    cell.fill = PatternFill(start_color="FFF2CC", end_color="FFF2CC", fill_type="solid")
+
+    for column in ws.columns:
+        max_length = 0
+        column_letter = column[0].column_letter
+
+        for cell in column:
+            try:
+                if len(str(cell.value)) > max_length:
+                    max_length = len(str(cell.value))
+            except:
+                pass
+
+        adjusted_width = min(max_length + 2, 50)
+        ws.column_dimensions[column_letter].width = adjusted_width
+
+
+    ws.insert_rows(1, 2)
+    ws['A1'] = f"Отчет по анализу КТ исследований - {datetime.now().strftime('%d.%m.%Y %H:%M')}"
+    ws['A1'].font = Font(bold=True, size=14)
+
+    total_studies = len(report_data)
+    pathology_count = sum(1 for r in report_data if r["pathology"] == 1)
+    ws[
+        'A2'] = f"Всего исследований: {total_studies}, Патология обнаружена: {pathology_count}, Норма: {total_studies - pathology_count}"
+    ws['A2'].font = Font(italic=True)
+
+
+    wb.save(output_path)
 
     return output_path
+
