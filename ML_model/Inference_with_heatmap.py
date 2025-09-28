@@ -340,7 +340,7 @@ class CTInferenceProcessor:
 
             # Определение класса и вероятности
             probability = self.sigmoid_transform(reconstruction_error)
-            pathology_class = 1 if reconstruction_error > self.optimal_threshold else 0
+            pathology_class = 1 if probability > 0.43 else 0
 
             # Заполняем результат
             result.update({
