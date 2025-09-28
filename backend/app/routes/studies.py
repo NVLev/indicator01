@@ -102,7 +102,8 @@ async def upload_study(
             "ready_for_inference": study.ready_for_inference,
             "inference_completed": study.inference_completed,
             "created_at": study.created_at,
-            "updated_at": study.updated_at
+            "updated_at": study.updated_at,
+            "heatmap_visualization_url": f"/api/studies/{study.id}/heatmap"
         }
         return StudyResponse(**study_data)
 
@@ -172,8 +173,10 @@ async def get_study(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Исследование не найдено"
         )
-
-    return StudyResponse.model_validate(study)  # noqa: игнорируй эту ошибку
+    study_response = StudyResponse.model_validate(study)
+    study_dict = study_response.model_dump()
+    study_dict["heatmap_visualization_url"] = f"/api/studies/{study_id}/heatmap"
+    return study_dict
 
 
 @router.get("/{study_id}/progress", summary="Прогресс обработки")
@@ -386,6 +389,61 @@ async def export_study_excel(
         # Файл будет удален после отправки благодаря delete=False
         pass
 
+
+@router.get(
+    "/{study_id}/heatmap",
+    summary="Получить heatmap визуализацию",
+    response_class=FileResponse
+)
+async def get_heatmap_visualization(
+        study_id: int,
+        current_user: User = Depends(get_current_user),
+        session: AsyncSession = Depends(db_helper.session_getter)
+):
+    """
+    Получить PNG визуализацию heatmap для исследования
+
+    - Возвращает PNG изображение с визуализацией heatmap
+    - Показывает области, которые модель считает аномальными
+    - Используется для объяснения решения ИИ врачу
+    """
+    study = await StudyService.get_study(study_id, current_user.id, session)
+
+    if not study:
+        raise HTTPException(status_code=404, detail="Исследование не найдено")
+
+    # Проверяем, есть ли heatmap путь
+    if not study.heatmap_path:
+        raise HTTPException(
+            status_code=404,
+            detail="Heatmap данные не найдены для этого исследования"
+        )
+
+    heatmap_path = Path(study.heatmap_path) / "heatmap_visualization.png"
+
+    if not heatmap_path.exists():
+        # Пробуем альтернативные пути
+        alternative_paths = [
+            Path(study.heatmap_path) / "heatmap_visualization.png",
+            Path("/app/processed_studies") / f"study_{study_id}" / "heatmaps" / "heatmap_visualization.png",
+            Path(study.path_to_study) / "heatmaps" / "heatmap_visualization.png"
+        ]
+
+        for alt_path in alternative_paths:
+            if alt_path.exists():
+                heatmap_path = alt_path
+                break
+        else:
+            raise HTTPException(
+                status_code=404,
+                detail="Визуализация heatmap не найдена"
+            )
+
+    return FileResponse(
+        heatmap_path,
+        filename=f"heatmap_study_{study_id}.png",
+        media_type="image/png"
+    )
 
 @router.delete("/{study_id}", summary="Удалить исследование")
 async def delete_study(

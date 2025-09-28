@@ -132,6 +132,7 @@ class StudyResponse(StudyBase):
     needs_verification: bool = Field(False, description="Требуется проверка врачом")
     verification_score: Optional[float] = Field(None, description="Оценка достоверности AI")
     verification_warnings: List[str] = Field([], description="Предупреждения верификации")
+    heatmap_visualization_url: Optional[str] = None
 
 
     @computed_field(description="Информация о heatmap данных")

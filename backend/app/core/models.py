@@ -106,9 +106,9 @@ class Study(Base):
     pathology_localization_coords: Mapped[Optional[dict]] = mapped_column(JSON)  # {x_min: 10, x_max: 20, ...}
 
     # Heatmap.  Пока непонятно, в каком виде, поэтому делется на все файлы)
-    heatmap_path: Mapped[Optional[str]] = mapped_column(String(500))  # Path to heatmap file (PNG/NPY)
-    heatmap_format: Mapped[Optional[str]] = mapped_column(String(20))  # "png", "npy", "json", etc.
-    heatmap_metadata: Mapped[Optional[dict]] = mapped_column(JSON)  # Доп. информация  (размеры, etc.)
+    heatmap_path: Mapped[Optional[str]] = mapped_column(String(500))
+    heatmap_format: Mapped[Optional[str]] = mapped_column(String(20))
+    heatmap_metadata: Mapped[Optional[dict]] = mapped_column(JSON)
 
     # Доп. метадата
     total_instances: Mapped[Optional[int]] = mapped_column(Integer)  # Количество файлов DICOM
