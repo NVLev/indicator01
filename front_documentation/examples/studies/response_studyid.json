@@ -1,0 +1,85 @@
+{
+  "filename": "pneumotorax_anon.zip",
+  "id": 60,
+  "user_id": 1,
+  "file_path": "/app/backend/uploads/1/pneumotorax_anon.zip",
+  "path_to_study": "/app/processed_studies/1.2.276.0.7230010.3.1.2.2462171185.19116.1754560222.2501",
+  "study_uid": "1.2.276.0.7230010.3.1.2.2462171185.19116.1754560222.2501",
+  "series_uid": "1.2.276.0.7230010.3.1.3.2462171185.19116.1754560222.2502",
+  "processing_status": "обработано",
+  "probability_of_pathology": 0.4423576370157131,
+  "pathology": 1,
+  "time_of_processing": 0,
+  "most_dangerous_pathology_type": "пневмония",
+  "pathology_localization_coords": {
+    "x_min": 0,
+    "x_max": 128,
+    "y_min": 0,
+    "y_max": 128,
+    "z_min": 2,
+    "z_max": 3,
+    "confidence": 0.9212417006492615
+  },
+  "heatmap_path": "/app/processed_studies/study_60/heatmaps",
+  "heatmap_format": "npy",
+  "heatmap_metadata": {
+    "statistics": {
+      "max_error": 0.9212417006492615,
+      "mean_error": 0.020417625084519386,
+      "std_error": 0.06074776500463486,
+      "percentile_95": 0.11229891702532768,
+      "percentile_99": 0.32764289528131485,
+      "total_error_volume": 21409.431640625
+    },
+    "verification": null,
+    "max_slice": 2,
+    "heatmap_data_info": {
+      "present": true,
+      "error_map_shape": [
+        128,
+        128,
+        64
+      ],
+      "max_error_slice_index": 2,
+      "has_visualization": true
+    },
+    "heatmap_statistics": {
+      "max_error": 0.9212417006492615,
+      "mean_error": 0.020417625084519386,
+      "std_error": 0.06074776500463486,
+      "percentile_95": 0.11229891702532768,
+      "percentile_99": 0.32764289528131485,
+      "total_error_volume": 21409.431640625
+    }
+  },
+  "total_instances": 1,
+  "series_count": 1,
+  "error_message": null,
+  "ready_for_inference": true,
+  "inference_completed": true,
+  "created_at": "2025-09-28T16:38:50.136174Z",
+  "updated_at": "2025-09-28T16:38:56.983187Z",
+  "needs_verification": false,
+  "verification_score": null,
+  "verification_warnings": [],
+  "heatmap_visualization_url": "/api/studies/60/heatmap",
+  "heatmap_data_info": {
+    "present": true,
+    "error_map_shape": [
+      128,
+      128,
+      64
+    ],
+    "max_error_slice_index": 2,
+    "has_visualization": true
+  },
+  "heatmap_statistics": {
+    "max_error": 0.9212417006492615,
+    "mean_error": 0.020417625084519386,
+    "std_error": 0.06074776500463486,
+    "percentile_95": 0.11229891702532768,
+    "percentile_99": 0.32764289528131485,
+    "total_error_volume": 21409.431640625
+  },
+  "needs_review": false
+}

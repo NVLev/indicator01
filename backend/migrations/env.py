@@ -6,9 +6,12 @@ from sqlalchemy import engine_from_config
 from sqlalchemy import pool
 from sqlalchemy.ext.asyncio import async_engine_from_config
 from alembic import context
+import sys
+import os
 
-from backend.app.core.models import Base, User, RefreshToken, Study
-from backend.app.core.config import settings
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from app.core.models import Base, User, RefreshToken, Study
+from app.core.config import settings
 import asyncio
 
 
@@ -29,7 +32,6 @@ if config.config_file_name is not None:
 # target_metadata = mymodel.Base.metadata
 target_metadata = Base.metadata
 print("Alembic sees tables:", target_metadata.tables.keys())
-from backend.app.core.models import User, RefreshToken
 # other values from the config, defined by the needs of env.py,
 # can be acquired:
 # my_important_option = config.get_main_option("my_important_option")

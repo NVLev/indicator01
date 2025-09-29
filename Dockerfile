@@ -7,7 +7,10 @@ RUN apt-get update && apt-get install -y \
     libpq-dev \
     curl \
     redis-tools \
+    libgl1 \
+    libglib2.0-0 \
     && rm -rf /var/lib/apt/lists/*
+
 
 COPY backend/requirements_backend.txt .
 
@@ -19,6 +22,6 @@ COPY backend /app/backend
 
 ENV PYTHONPATH=/app/backend
 
-RUN mkdir -p /app/uploads /app/processed_studies
+
 
 CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8010"]

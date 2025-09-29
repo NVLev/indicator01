@@ -1,6 +1,6 @@
 import json
 from enum import Enum
-from pydantic import BaseModel, EmailStr, Field, field_validator, ConfigDict
+from pydantic import BaseModel, EmailStr, Field, field_validator, ConfigDict, computed_field
 from datetime import datetime
 from typing import List, Optional, Dict, Any, Union
 from enum import Enum
@@ -86,39 +86,23 @@ class StudyUpdate(BaseModel):
     pathology: Optional[int] = None
     time_of_processing: Optional[float] = None
     most_dangerous_pathology_type: Optional[str] = None
-    pathology_localization_coords: Optional[Dict[str, float]] = None  # Changed from string to dict
+    pathology_localization_coords: Optional[Dict[str, float]] = None
     heatmap_path: Optional[str] = None
     heatmap_format: Optional[str] = None
     heatmap_metadata: Optional[Dict[str, Any]] = None
     error_message: Optional[str] = None
 
+# Дополнительная схема для координат локализации
+class PathologyLocalization(BaseModel):
+    """Схема для координат локализации патологии"""
+    x_min: float
+    x_max: float
+    y_min: float
+    y_max: float
+    z_min: float
+    z_max: float
+    confidence: Optional[float] = None
 
-# class StudyResponse(StudyBase):
-#     """Схема для ответа"""
-#     model_config = ConfigDict(from_attributes=True)
-#
-#     id: int
-#     user_id: int
-#     file_path: str
-#     path_to_study: Optional[str] = None
-#     study_uid: Optional[str] = None
-#     series_uid: Optional[str] = None
-#     processing_status: StudyStatus
-#     probability_of_pathology: Optional[float] = None
-#     pathology: Optional[int] = None
-#     time_of_processing: Optional[float] = None
-#     most_dangerous_pathology_type: Optional[str] = None
-#     pathology_localization_coords: Optional[Dict[str, float]] = None  # Changed from string to dict
-#     heatmap_path: Optional[str] = None
-#     heatmap_format: Optional[str] = None
-#     heatmap_metadata: Optional[Dict[str, Any]] = None
-#     total_instances: Optional[int] = None
-#     series_count: Optional[int] = None
-#     error_message: Optional[str] = None
-#     ready_for_inference: bool
-#     inference_completed: bool
-#     created_at: datetime
-#     updated_at: datetime
 class StudyResponse(StudyBase):
     """Схема для ответа"""
     model_config = ConfigDict(from_attributes=True)
@@ -129,12 +113,12 @@ class StudyResponse(StudyBase):
     path_to_study: Optional[str] = None
     study_uid: Optional[str] = None
     series_uid: Optional[str] = None
-    processing_status: str  # Измените с StudyStatus на str
+    processing_status: str
     probability_of_pathology: Optional[float] = None
     pathology: Optional[int] = None
     time_of_processing: Optional[float] = None
     most_dangerous_pathology_type: Optional[str] = None
-    pathology_localization_coords: Optional[Dict[str, float]] = None
+    pathology_localization_coords: Optional[PathologyLocalization] = None
     heatmap_path: Optional[str] = None
     heatmap_format: Optional[str] = None
     heatmap_metadata: Optional[Dict[str, Any]] = None
@@ -145,6 +129,31 @@ class StudyResponse(StudyBase):
     inference_completed: bool
     created_at: datetime
     updated_at: datetime
+    needs_verification: bool = Field(False, description="Требуется проверка врачом")
+    verification_score: Optional[float] = Field(None, description="Оценка достоверности AI")
+    verification_warnings: List[str] = Field([], description="Предупреждения верификации")
+    heatmap_visualization_url: Optional[str] = None
+
+
+    @computed_field(description="Информация о heatmap данных")
+    @property
+    def heatmap_data_info(self) -> Optional[Dict]:
+        if self.heatmap_metadata and isinstance(self.heatmap_metadata, dict):
+            return self.heatmap_metadata.get('heatmap_data_info')
+        return None
+
+    @computed_field(description="Статистика heatmap")
+    @property
+    def heatmap_statistics(self) -> Optional[Dict]:
+        if self.heatmap_metadata and isinstance(self.heatmap_metadata, dict):
+            return self.heatmap_metadata.get('heatmap_statistics')
+        return None
+
+    @computed_field(description="Требуется проверка врачом")
+    @property
+    def needs_review(self) -> bool:
+        return self.needs_verification
+
 
     @field_validator('processing_status', mode='before')
     @classmethod
@@ -182,7 +191,6 @@ class StudyResponse(StudyBase):
             return None
         return v.isoformat() if hasattr(v, 'isoformat') else v
 
-
 class StudyListResponse(BaseModel):
     """Схема для списка исследований с пагинацией"""
     studies: List[StudyResponse]
@@ -195,8 +203,8 @@ class StudyListResponse(BaseModel):
 class StudyStatusResponse(BaseModel):
     """Простой ответ по статусу"""
     id: int
-    processing_status: StudyStatus  # Changed to enum
-    progress: Optional[float] = None  # For future progress tracking
+    processing_status: StudyStatus
+    progress: Optional[float] = None
     error_message: Optional[str] = None
 
 

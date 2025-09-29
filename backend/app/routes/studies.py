@@ -6,7 +6,7 @@ from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, status
 from fastapi.responses import FileResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import func, select
-
+import logging
 from ..core.db_helper import db_helper
 from ..core.models import User, Study, StudyStatus
 from ..core.schemas import StudyResponse, StudyListResponse, ExcelReportRequest
@@ -14,9 +14,12 @@ from ..services.study_service import StudyService, create_excel_report
 from ..services.security import get_current_user
 from workers.tasks import process_complete_study_task
 
+logger = logging.getLogger(__name__)
+
+
 
 router = APIRouter(prefix="/studies", tags=["Исследования"])
-
+demo_router = APIRouter(prefix="/demo", tags=["Демо"])
 
 @router.post("/upload", response_model=StudyResponse, summary="Загрузить исследование")
 async def upload_study(
@@ -41,7 +44,7 @@ async def upload_study(
                 detail="Поддерживаются только ZIP-архивы"
             )
         # Создаем директорию для загруженных файлов
-        upload_dir = Path("uploads") / str(current_user.id)
+        upload_dir = Path("/app/backend/uploads") / str(current_user.id)
         upload_dir.mkdir(parents=True, exist_ok=True)
 
         # Сохраняем файл
@@ -50,7 +53,11 @@ async def upload_study(
 
         with open(file_path, "wb") as buffer:
             buffer.write(content)
-
+        if not file_path.exists() or file_path.stat().st_size == 0:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Не удалось сохранить файл на сервер"
+            )
         # Создаем запись в БД
         study = await StudyService.create_study(
             user_id=current_user.id,  # noqa: PyCharm ложное срабатывание
@@ -64,6 +71,9 @@ async def upload_study(
             zip_file_path=str(file_path),
             study_id=study.id
         )
+
+        # Логируем успешное сохранение
+        logger.info(f"Файл успешно сохранен: {file_path}, размер: {file_path.stat().st_size} байт")
 
         # Сохраняем ID задачи для отслеживания
         study.task_id = task_result.id
@@ -92,7 +102,8 @@ async def upload_study(
             "ready_for_inference": study.ready_for_inference,
             "inference_completed": study.inference_completed,
             "created_at": study.created_at,
-            "updated_at": study.updated_at
+            "updated_at": study.updated_at,
+            "heatmap_visualization_url": f"/studies/{study.id}/heatmap"
         }
         return StudyResponse(**study_data)
 
@@ -162,8 +173,10 @@ async def get_study(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Исследование не найдено"
         )
-
-    return StudyResponse.model_validate(study)  # noqa: игнорируй эту ошибку
+    study_response = StudyResponse.model_validate(study)
+    study_dict = study_response.model_dump()
+    study_dict["heatmap_visualization_url"] = f"/studies/{study_id}/heatmap"
+    return study_dict
 
 
 @router.get("/{study_id}/progress", summary="Прогресс обработки")
@@ -327,12 +340,18 @@ async def export_study_excel(
     if not study:
         raise HTTPException(status_code=404, detail="Исследование не найдено")
 
-    if study.processing_status != StudyStatus.COMPLETED:
+    allowed_statuses = [StudyStatus.COMPLETED, StudyStatus.NEEDS_REVIEW]
+    if study.processing_status not in allowed_statuses:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Исследование еще не обработано"
         )
 
+    if not study.inference_completed:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="ML анализ исследования не завершен"
+        )
     try:
         # Подготавливаем данные для отчета
         study_data = {
@@ -341,10 +360,14 @@ async def export_study_excel(
                 "StudyInstanceUID": study.study_uid or "",
                 "SeriesInstanceUID": study.series_uid or "",
             },
-            "processing_status": "Success",
+            "processing_status": "Success" if study.processing_status in ["completed",
+                                                                          "обработано"] else "Needs Review",
             "processing_time": study.time_of_processing or 0.0,
             "probability_of_pathology": study.probability_of_pathology or 0.0,
             "pathology": study.pathology or 0,
+            # ДОБАВЬТЕ ЭТИ ПОЛЯ:
+            "most_dangerous_pathology_type": study.most_dangerous_pathology_type or "",
+            "pathology_localization_coords": study.pathology_localization_coords or None
         }
 
         # Создаем временный файл
@@ -370,6 +393,61 @@ async def export_study_excel(
         # Файл будет удален после отправки благодаря delete=False
         pass
 
+
+@router.get(
+    "/{study_id}/heatmap",
+    summary="Получить heatmap визуализацию",
+    response_class=FileResponse
+)
+async def get_heatmap_visualization(
+        study_id: int,
+        current_user: User = Depends(get_current_user),
+        session: AsyncSession = Depends(db_helper.session_getter)
+):
+    """
+    Получить PNG визуализацию heatmap для исследования
+
+    - Возвращает PNG изображение с визуализацией heatmap
+    - Показывает области, которые модель считает аномальными
+    - Используется для объяснения решения ИИ врачу
+    """
+    study = await StudyService.get_study(study_id, current_user.id, session)
+
+    if not study:
+        raise HTTPException(status_code=404, detail="Исследование не найдено")
+
+    # Проверяем, есть ли heatmap путь
+    if not study.heatmap_path:
+        raise HTTPException(
+            status_code=404,
+            detail="Heatmap данные не найдены для этого исследования"
+        )
+
+    heatmap_path = Path(study.heatmap_path) / "heatmap_visualization.png"
+
+    if not heatmap_path.exists():
+        # Пробуем альтернативные пути
+        alternative_paths = [
+            Path(study.heatmap_path) / "heatmap_visualization.png",
+            Path("/app/processed_studies") / f"study_{study_id}" / "heatmaps" / "heatmap_visualization.png",
+            Path(study.path_to_study) / "heatmaps" / "heatmap_visualization.png"
+        ]
+
+        for alt_path in alternative_paths:
+            if alt_path.exists():
+                heatmap_path = alt_path
+                break
+        else:
+            raise HTTPException(
+                status_code=404,
+                detail="Визуализация heatmap не найдена"
+            )
+
+    return FileResponse(
+        heatmap_path,
+        filename=f"heatmap_study_{study_id}.png",
+        media_type="image/png"
+    )
 
 @router.delete("/{study_id}", summary="Удалить исследование")
 async def delete_study(
@@ -417,3 +495,4 @@ async def delete_study(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Ошибка удаления: {str(e)}"
         )
+

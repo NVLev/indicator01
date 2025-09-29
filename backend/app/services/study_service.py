@@ -138,6 +138,7 @@ def _process_dicom_study_sync(
         logger.info(f"Извлечение исследования {study_id} во временную папку {temp_extract_dir}")
 
         dicom_files = extract_zip_archive(zip_file_path, temp_extract_dir)
+
         if not dicom_files:
             raise DicomProcessingError("В архиве не найдено DICOM-файлов")
 
@@ -229,6 +230,13 @@ async def update_study_results(
 
         metadata = results.get("study_metadata", {})
 
+        study.probability_of_pathology = results.get("probability_of_pathology", 0.0)
+        study.pathology = results.get("pathology", 0)
+        study.most_dangerous_pathology_type = results.get("most_dangerous_pathology_type", "")
+        study.pathology_localization_coords = results.get("pathology_localization_coords")
+        study.heatmap_path = results.get("heatmap_path", "")
+        study.heatmap_format = results.get("heatmap_format", "")
+        study.heatmap_metadata = results.get("heatmap_metadata")
         study.study_uid = metadata.get("StudyInstanceUID", "")
         study.series_uid = metadata.get("SeriesInstanceUID", "")
         study.path_to_study = results.get("organized_path", "") or study.path_to_study
@@ -349,23 +357,83 @@ def group_files_by_series(file_paths: List[Path]) -> Dict[str, List[Path]]:
 
 
 def organize_dicom_files(series_groups: Dict[str, List[Path]], output_dir: str, study_uid: str) -> str:
-    """Копируем/организуем DICOM-файлы в структуру output_dir/<study_uid>/<series_uid>"""
-    study_dir = Path(output_dir) / study_uid
+    """Копируем DICOM-файлы в плоскую структуру (все файлы в корне исследования)"""
+
+    base_dir = Path("/app/processed_studies")
+    study_dir = base_dir / study_uid
     study_dir.mkdir(parents=True, exist_ok=True)
 
+    logger.info(f"📁 Создание плоской структуры в: {study_dir}")
+
+    total_files = 0
+    file_counter = 0
+
+    # Собираем все файлы из всех серий
+    all_files = []
     for series_uid, files in series_groups.items():
-        series_dir = study_dir / series_uid
-        series_dir.mkdir(exist_ok=True)
-        for i, file_path in enumerate(files):
-            try:
-                new_filename = f"{series_uid}_{i:04d}.dcm"
-                new_path = series_dir / new_filename
-                shutil.copy2(file_path, new_path)
-            except Exception as e:
-                logger.warning(f"Ошибка при копировании {file_path}: {e}")
+        all_files.extend(files)
+
+    # Копируем все файлы в корень директории исследования с простыми именами
+    for file_path in all_files:
+        try:
+            # Создаем простое имя файла
+            new_filename = f"image_{file_counter:05d}.dcm"
+            new_path = study_dir / new_filename
+            shutil.copy2(file_path, new_path)
+
+            # Проверяем, что файл скопировался
+            if new_path.exists():
+                total_files += 1
+                file_counter += 1
+                logger.debug(f"✅ Скопирован: {file_path.name} -> {new_path.name}")
+            else:
+                logger.error(f"❌ Файл не скопировался: {file_path}")
+
+        except Exception as e:
+            logger.error(f"❌ Ошибка копирования {file_path}: {e}")
+
+    logger.info(f"✅ Успешно скопировано {total_files} файлов в плоскую структуру")
+
+    # Проверяем результат
+    dcm_files = list(study_dir.glob("*.dcm"))
+    logger.info(f"🔍 Проверка: в {study_dir} найдено {len(dcm_files)} .dcm файлов")
+
+    if len(dcm_files) == 0:
+        logger.error("❌ КРИТИЧЕСКАЯ ОШИБКА: Файлы не скопировались в плоскую структуру!")
+        # Попробуем альтернативный метод с сохранением оригинальных имен
+        return organize_with_original_names(series_groups, study_dir, study_uid)
 
     return str(study_dir)
 
+
+def organize_with_original_names(series_groups: Dict[str, List[Path]], study_dir: Path, study_uid: str) -> str:
+    """Альтернативный метод: копируем с оригинальными именами файлов"""
+
+    logger.info("🔄 Попытка копирования с оригинальными именами")
+
+    total_files = 0
+
+    # Копируем все файлы, сохраняя оригинальные имена
+    for series_uid, files in series_groups.items():
+        for i, file_path in enumerate(files):
+            try:
+                # Используем оригинальное имя файла
+                original_name = file_path.name
+                new_path = study_dir / original_name
+
+                # Если файл с таким именем уже существует, добавляем суффикс
+                if new_path.exists():
+                    new_path = study_dir / f"{i:04d}_{original_name}"
+
+                shutil.copy2(file_path, new_path)
+                total_files += 1
+                logger.debug(f"✅ Скопирован с оригинальным именем: {original_name}")
+
+            except Exception as e:
+                logger.error(f"❌ Ошибка копирования {file_path}: {e}")
+
+    logger.info(f"✅ Скопировано {total_files} файлов с оригинальными именами")
+    return str(study_dir)
 
 def extract_zip_archive(zip_path: str, extract_to: str) -> List[Path]:
     """
@@ -373,15 +441,20 @@ def extract_zip_archive(zip_path: str, extract_to: str) -> List[Path]:
     скрытые файлы, и пытаемся отфильтровать не-DICOM.
     """
     extracted_files: List[Path] = []
+    logger.info("Начало обработки")
     try:
-        if not zipfile.is_zipfile(zip_path):
-            raise DicomProcessingError("Файл не является ZIP-архивом")
+        with zipfile.ZipFile(zip_path, 'r') as zip_ref:
+            bad_file = zip_ref.testzip()
+            if bad_file:
+                raise DicomProcessingError(f"Повреждённый файл в архиве: {bad_file}")
+
 
         with zipfile.ZipFile(zip_path, "r") as zip_ref:
             file_list = [
                 f for f in zip_ref.namelist()
                 if not f.endswith("/") and not os.path.basename(f).startswith(".")
             ]
+            logger.info(f" Найдено {len(file_list)} файлов в архиве: {file_list[:5]}...")
             if not file_list:
                 raise DicomProcessingError("ZIP-архив пуст")
 
@@ -390,10 +463,12 @@ def extract_zip_archive(zip_path: str, extract_to: str) -> List[Path]:
                 try:
                     extracted_path_str = zip_ref.extract(file_name, extract_to)
                     extracted_path = Path(extracted_path_str)
+                    logger.debug(f"Checking if {extracted_path.name} is DICOM...")
                     if is_likely_dicom_file(extracted_path):
                         extracted_files.append(extracted_path)
+                        logger.debug(f"✓ {extracted_path.name} identified as DICOM")
                     else:
-                        # удаляем ненужные извлеченные файлы
+                        logger.debug(f"✗ {extracted_path.name} not identified as DICOM")
                         try:
                             os.remove(extracted_path)
                         except Exception:
@@ -407,7 +482,8 @@ def extract_zip_archive(zip_path: str, extract_to: str) -> List[Path]:
         return extracted_files
 
     except zipfile.BadZipFile:
-        raise DicomProcessingError("Некорректный или повреждённый ZIP-архив")
+        raise DicomProcessingError("Файл не является ZIP-архивом или повреждён")
+
     except PermissionError:
         raise DicomProcessingError("Отказ в доступе при распаковке архива")
     except Exception as e:
@@ -417,26 +493,43 @@ def extract_zip_archive(zip_path: str, extract_to: str) -> List[Path]:
 def is_likely_dicom_file(file_path: Path) -> bool:
     """Эвристическая проверка, похож ли файл на DICOM (по размеру, расширению, сигнатуре)"""
     try:
-        if not file_path.exists() or file_path.stat().st_size < 1024:
+        if not file_path.exists() or file_path.stat().st_size < 128:  # Reduced from 1024
             return False
 
         dicom_extensions = {".dcm", ".dic", ".dicom", ""}
-        if file_path.suffix.lower() not in dicom_extensions:
+        file_suffix = file_path.suffix.lower()
+
+        skip_extensions = {".txt", ".log", ".xml", ".json", ".zip", ".rar", ".exe", ".dll"}
+        if file_suffix in skip_extensions:
             return False
+
+        if file_suffix not in dicom_extensions and file_suffix != "":
+            pass
 
         with open(file_path, "rb") as f:
             header = f.read(132)
 
         if len(header) >= 132 and header[128:132] == b"DICM":
             return True
+
         if len(header) >= 4 and header[0:4] in [b"DICM", b"MEDI", b"ACR"]:
             return True
 
-        # По умолчанию — возможно DICOM (force=True в pydicom позже уточнит)
-        return True
-    except Exception:
+
+        if len(header) >= 8:
+            for i in range(0, min(64, len(header) - 4), 2):
+                if header[i:i + 2] in [b'\x02\x00', b'\x08\x00', b'\x10\x00', b'\x20\x00']:
+                    return True
+
+        if file_suffix == "":
+            return True
+
         return False
 
+    except Exception as e:
+        logger.debug(f"Error checking if {file_path} is DICOM: {e}")
+        # When in doubt, let pydicom decide later
+        return True
 
 class StudyService:
     """Сервис для CRUD-операций с исследованиями"""
@@ -512,8 +605,63 @@ class StudyService:
             return []
 
 
+#----------БЛОК ДЛЯ ДЕМО РЕЖИМА---------------------------
+    @classmethod
+    async def create_demo_study(
+            cls,
+            filename: str,
+            file_path: str,
+            session: AsyncSession
+    ) -> Study:
+        """Создать исследование для демо-режима (без привязки к пользователю)"""
+        try:
+            study = Study(
+                # user_id=None,  # Если поле nullable=True
+                user_id=1,  # Или используем фиктивный ID
+                filename=filename,
+                file_path=file_path,
+                processing_status=StudyStatus.UPLOADED,
+                created_at=func.now(),
+                updated_at=func.now()
+            )
+            session.add(study)
+            await session.commit()
+            await session.refresh(study)
+            logger.info(f"Создано демо-исследование id={study.id}")
+            return study
+        except Exception as e:
+            await session.rollback()
+            logger.exception(f"Ошибка при создании демо-исследования: {e}")
+            raise
+    @classmethod
+    async def get_all_studies(cls, session: AsyncSession, limit: int = 100):
+        """Получить все исследования (для демо)"""
+        from sqlalchemy import select
+        from app.core.models import Study
+
+        stmt = select(Study).order_by(Study.created_at.desc()).limit(limit)
+        result = await session.execute(stmt)
+        return result.scalars().all()
+
+    @classmethod
+    async def get_study_by_id(cls, study_id: int, session: AsyncSession):
+        """Получить исследование по ID без проверки пользователя"""
+        from sqlalchemy import select
+        from app.core.models import Study
+
+        stmt = select(Study).where(Study.id == study_id)
+        result = await session.execute(stmt)
+        return result.scalar_one_or_none()
+
+#-------------КОНЕЦ БЛОКА---------------------------------------------
+
 def create_excel_report(processing_results: List[Dict[str, Any]], output_path: str) -> str:
-    """Формирует Excel-отчет в формате, описанном в ТЗ."""
+    """Формирует улучшенный Excel-отчет в формате ТЗ с форматированием."""
+    import pandas as pd
+    from openpyxl import load_workbook
+    from openpyxl.styles import Font, PatternFill, Border, Side, Alignment
+    from openpyxl.utils.dataframe import dataframe_to_rows
+    from datetime import datetime
 
     report_data = []
 
@@ -521,32 +669,129 @@ def create_excel_report(processing_results: List[Dict[str, Any]], output_path: s
         study_metadata = result.get("study_metadata", {})
 
         raw_status = result.get("processing_status", "Failure")
-        if str(raw_status).lower() in {"completed", "success", "ok"}:
+        if str(raw_status).lower() in {"completed", "success", "ok", "обработано"}:
             status_str = "Success"
+        elif str(raw_status).lower() in {"needsreview", "needs_review", "требует_проверки"}:
+            status_str = "Needs Review"
         else:
             status_str = "Failure"
 
-        # Базовые обязательные поля
-        row = {"path_to_study": result.get("organized_path", ""),
-               "study_uid": study_metadata.get("StudyInstanceUID", ""),
-               "series_uid": study_metadata.get("SeriesInstanceUID", ""),
-               "probability_of_pathology": result.get("probability_of_pathology", 0.0),
-               "pathology": result.get("pathology", 0), "processing_status": status_str,
-               "time_of_processing": result.get("processing_time", 0.0),
-               "most_dangerous_pathology_type": result.get("most_dangerous_pathology_type", "")}
+        pathology_type = result.get("most_dangerous_pathology_type", "")
+        if not pathology_type and result.get("pathology", 0) == 1:
+            pathology_type = "Патология обнаружена"
 
-        # Опциональные поля
-        # Если локализация есть как dict → превращаем в строку "x_min,x_max,y_min,y_max,z_min,z_max"
-        loc = result.get("pathology_localization")
+        row = {
+            "path_to_study": result.get("organized_path", ""),
+            "study_uid": study_metadata.get("StudyInstanceUID", ""),
+            "series_uid": study_metadata.get("SeriesInstanceUID", ""),
+            "probability_of_pathology": round(result.get("probability_of_pathology", 0.0), 4),
+            "pathology": result.get("pathology", 0),
+            "processing_status": status_str,
+            "time_of_processing": round(result.get("processing_time", 0.0), 2),
+            "most_dangerous_pathology_type": pathology_type,
+            "pathology_localization": "",
+            "generation_date": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        }
+        loc = result.get("pathology_localization_coords")
         if isinstance(loc, dict):
-            coords = [str(loc.get(k, "")) for k in ["x_min", "x_max", "y_min", "y_max", "z_min", "z_max"]]
+            # Извлекаем координаты в правильном порядке
+            coords = [
+                str(loc.get("x_min", "")),
+                str(loc.get("x_max", "")),
+                str(loc.get("y_min", "")),
+                str(loc.get("y_max", "")),
+                str(loc.get("z_min", "")),
+                str(loc.get("z_max", ""))
+            ]
             row["pathology_localization"] = ",".join(coords)
+            print(f"Локализация добавлена: {row['pathology_localization']}")  # Для отладки
         else:
-            row["pathology_localization"] = ""
+            print(f"Локализация не найдена или неверный формат: {loc}")
+
 
         report_data.append(row)
 
+
     df = pd.DataFrame(report_data)
-    df.to_excel(output_path, index=False)
+
+
+    column_names = {
+        "path_to_study": "path_to_study",
+        "study_uid": "study_uid",
+        "series_uid": "series_uid",
+        "probability_of_pathology": "probability_of_pathology",
+        "pathology": "pathology",
+        "processing_status": "processing_status",
+        "time_of_processing": "time_of_processing",
+        "most_dangerous_pathology_type": "most_dangerous_pathology_type",
+        "pathology_localization": "pathology_localization",
+        "generation_date": "generation_date"
+    }
+
+    df = df.rename(columns=column_names)
+
+    df.to_excel(output_path, index=False, engine='openpyxl')
+
+    wb = load_workbook(output_path)
+    ws = wb.active
+
+    header_font = Font(bold=True, color="FFFFFF")
+    header_fill = PatternFill(start_color="366092", end_color="366092", fill_type="solid")
+    border = Border(
+        left=Side(style='thin'),
+        right=Side(style='thin'),
+        top=Side(style='thin'),
+        bottom=Side(style='thin')
+    )
+
+    for cell in ws[1]:
+        cell.font = header_font
+        cell.fill = header_fill
+        cell.alignment = Alignment(horizontal="center", vertical="center")
+        cell.border = border
+
+    for row in ws.iter_rows(min_row=2, max_row=ws.max_row, min_col=1, max_col=ws.max_column):
+        for cell in row:
+            cell.border = border
+            cell.alignment = Alignment(vertical="center")
+
+            if cell.column == 5:
+                if cell.value == 1:
+                    cell.fill = PatternFill(start_color="FFE6E6", end_color="FFE6E6", fill_type="solid")
+                else:
+                    cell.fill = PatternFill(start_color="E6F7E6", end_color="E6F7E6", fill_type="solid")
+
+            elif cell.column == 4:
+                if isinstance(cell.value, (int, float)) and cell.value > 0.5:
+                    cell.fill = PatternFill(start_color="FFF2CC", end_color="FFF2CC", fill_type="solid")
+
+    for column in ws.columns:
+        max_length = 0
+        column_letter = column[0].column_letter
+
+        for cell in column:
+            try:
+                if len(str(cell.value)) > max_length:
+                    max_length = len(str(cell.value))
+            except:
+                pass
+
+        adjusted_width = min(max_length + 2, 50)
+        ws.column_dimensions[column_letter].width = adjusted_width
+
+
+    ws.insert_rows(1, 2)
+    ws['A1'] = f"Отчет по анализу КТ исследований - {datetime.now().strftime('%d.%m.%Y %H:%M')}"
+    ws['A1'].font = Font(bold=True, size=14)
+
+    total_studies = len(report_data)
+    pathology_count = sum(1 for r in report_data if r["pathology"] == 1)
+    ws[
+        'A2'] = f"Всего исследований: {total_studies}, Патология обнаружена: {pathology_count}, Норма: {total_studies - pathology_count}"
+    ws['A2'].font = Font(italic=True)
+
+
+    wb.save(output_path)
 
     return output_path
+

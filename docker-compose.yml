@@ -45,13 +45,30 @@ services:
     env_file:
       - .env
     volumes:
-      - ./uploads:/app/uploads
+      - shared_uploads:/app/backend/uploads
       - ./processed_studies:/app/processed_studies
       - ./backend:/app/backend
-    working_dir: /app/backend
     depends_on:
       pg:
         condition: service_healthy
+    networks:
+      - indicator_net
+
+  ml_service:
+    build:
+      context: .
+      dockerfile: Dockerfile.ml
+    container_name: indicator_ml
+    ports:
+      - "8501:8501"
+    volumes:
+      - shared_uploads:/app/uploads
+      - ./ML_model:/app/ML_model
+      - ./processed_studies:/app/processed_studies
+    environment:
+      - MODEL_PATH=/app/ML_model/best_pathology_model.keras
+      - THRESHOLD_PATH=/app/ML_model/pathology_threshold.json
+      - PROCESSED_DIR=/app/processed_studies
     networks:
       - indicator_net
 
@@ -79,7 +96,7 @@ services:
       - REDIS_URL=redis://redis:6379/0
       - PYTHONPATH=/app/backend
     volumes:
-      - ./uploads:/app/uploads
+      - shared_uploads:/app/backend/uploads
       - ./processed_studies:/app/processed_studies
       - ./backend:/app/backend
     depends_on:
@@ -101,7 +118,7 @@ services:
       - REDIS_URL=redis://redis:6379/0
       - PYTHONPATH=/app/backend
     volumes:
-      - ./uploads:/app/uploads
+      - shared_uploads:/app/backend/uploads
       - ./processed_studies:/app/processed_studies
       - ./backend:/app/backend
     depends_on:
@@ -112,6 +129,24 @@ services:
     networks:
       - indicator_net
     command: ["celery", "-A", "workers.tasks", "beat", "--loglevel=info"]
+
+  alembic:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    working_dir: /app/backend
+    environment:
+      - APP_CONFIG__DB__URL=postgresql+asyncpg://user:password@pg:5432/indicator
+      - PYTHONPATH=/app/backend
+    volumes:
+      - ./backend:/app/backend
+    depends_on:
+      pg:
+        condition: service_healthy
+    networks:
+      - indicator_net
+    profiles: [ "migrations" ]
+    command: [ "alembic", "upgrade", "head" ]
 
   flower:
     build:
@@ -136,6 +171,7 @@ services:
 volumes:
   pgdata:
   redis_data:
+  shared_uploads:
 
 networks:
   indicator_net:

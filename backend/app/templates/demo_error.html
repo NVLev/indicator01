@@ -1,0 +1,13 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div style="text-align: center; padding: 40px 0;">
+    <h1 style="color: #dc3545;">❌ Ошибка</h1>
+    <p style="font-size: 18px;">{{ error_message }}</p>
+    <div style="margin: 20px 0;">
+        <a href="/demo" style="background: #007bff; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;">
+            Вернуться на главную
+        </a>
+    </div>
+</div>
+{% endblock %}

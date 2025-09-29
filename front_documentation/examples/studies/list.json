@@ -1,0 +1,1768 @@
+{
+  "studies": [
+    {
+      "filename": "norma_anon.zip",
+      "id": 63,
+      "user_id": 1,
+      "file_path": "/app/backend/uploads/1/norma_anon.zip",
+      "path_to_study": "/app/processed_studies/1.2.276.0.7230010.3.1.2.2462171185.19116.1754559949.863",
+      "study_uid": "1.2.276.0.7230010.3.1.2.2462171185.19116.1754559949.863",
+      "series_uid": "1.2.276.0.7230010.3.1.3.2462171185.19116.1754559949.864",
+      "processing_status": "ошибка",
+      "probability_of_pathology": 0,
+      "pathology": 0,
+      "time_of_processing": 0,
+      "most_dangerous_pathology_type": "",
+      "pathology_localization_coords": null,
+      "heatmap_path": "",
+      "heatmap_format": "",
+      "heatmap_metadata": {
+        "statistics": {},
+        "verification": null,
+        "max_slice": 0,
+        "heatmap_data_info": {
+          "present": false,
+          "error_map_shape": [],
+          "max_error_slice_index": 0,
+          "has_visualization": false
+        },
+        "heatmap_statistics": {}
+      },
+      "total_instances": 451,
+      "series_count": 1,
+      "error_message": null,
+      "ready_for_inference": true,
+      "inference_completed": false,
+      "created_at": "2025-09-28T18:52:15.060817Z",
+      "updated_at": "2025-09-28T18:52:21.657833Z",
+      "needs_verification": false,
+      "verification_score": null,
+      "verification_warnings": [],
+      "heatmap_visualization_url": null,
+      "heatmap_data_info": {
+        "present": false,
+        "error_map_shape": [],
+        "max_error_slice_index": 0,
+        "has_visualization": false
+      },
+      "heatmap_statistics": {},
+      "needs_review": false
+    },
+    {
+      "filename": "pneumotorax_anon.zip",
+      "id": 62,
+      "user_id": 1,
+      "file_path": "/app/backend/uploads/1/pneumotorax_anon.zip",
+      "path_to_study": "/app/processed_studies/1.2.276.0.7230010.3.1.2.2462171185.19116.1754560222.2501",
+      "study_uid": "1.2.276.0.7230010.3.1.2.2462171185.19116.1754560222.2501",
+      "series_uid": "1.2.276.0.7230010.3.1.3.2462171185.19116.1754560222.2502",
+      "processing_status": "обработано",
+      "probability_of_pathology": 0.4423576370157131,
+      "pathology": 1,
+      "time_of_processing": 0,
+      "most_dangerous_pathology_type": "подозрение на патологию",
+      "pathology_localization_coords": {
+        "x_min": 0,
+        "x_max": 128,
+        "y_min": 0,
+        "y_max": 128,
+        "z_min": 2,
+        "z_max": 3,
+        "confidence": 0.9212417006492615
+      },
+      "heatmap_path": "/app/processed_studies/study_62/heatmaps",
+      "heatmap_format": "npy",
+      "heatmap_metadata": {
+        "statistics": {
+          "max_error": 0.9212417006492615,
+          "mean_error": 0.020417625084519386,
+          "std_error": 0.06074776500463486,
+          "percentile_95": 0.11229891702532768,
+          "percentile_99": 0.32764289528131485,
+          "total_error_volume": 21409.431640625
+        },
+        "verification": null,
+        "max_slice": 2,
+        "heatmap_data_info": {
+          "present": true,
+          "error_map_shape": [
+            128,
+            128,
+            64
+          ],
+          "max_error_slice_index": 2,
+          "has_visualization": true
+        },
+        "heatmap_statistics": {
+          "max_error": 0.9212417006492615,
+          "mean_error": 0.020417625084519386,
+          "std_error": 0.06074776500463486,
+          "percentile_95": 0.11229891702532768,
+          "percentile_99": 0.32764289528131485,
+          "total_error_volume": 21409.431640625
+        }
+      },
+      "total_instances": 1,
+      "series_count": 1,
+      "error_message": null,
+      "ready_for_inference": true,
+      "inference_completed": true,
+      "created_at": "2025-09-28T17:25:27.117153Z",
+      "updated_at": "2025-09-28T17:25:33.618296Z",
+      "needs_verification": false,
+      "verification_score": null,
+      "verification_warnings": [],
+      "heatmap_visualization_url": null,
+      "heatmap_data_info": {
+        "present": true,
+        "error_map_shape": [
+          128,
+          128,
+          64
+        ],
+        "max_error_slice_index": 2,
+        "has_visualization": true
+      },
+      "heatmap_statistics": {
+        "max_error": 0.9212417006492615,
+        "mean_error": 0.020417625084519386,
+        "std_error": 0.06074776500463486,
+        "percentile_95": 0.11229891702532768,
+        "percentile_99": 0.32764289528131485,
+        "total_error_volume": 21409.431640625
+      },
+      "needs_review": false
+    },
+    {
+      "filename": "pneumotorax_anon.zip",
+      "id": 61,
+      "user_id": 1,
+      "file_path": "/app/backend/uploads/1/pneumotorax_anon.zip",
+      "path_to_study": "/app/processed_studies/1.2.276.0.7230010.3.1.2.2462171185.19116.1754560222.2501",
+      "study_uid": "1.2.276.0.7230010.3.1.2.2462171185.19116.1754560222.2501",
+      "series_uid": "1.2.276.0.7230010.3.1.3.2462171185.19116.1754560222.2502",
+      "processing_status": "обработано",
+      "probability_of_pathology": 0.4423576370157131,
+      "pathology": 1,
+      "time_of_processing": 0,
+      "most_dangerous_pathology_type": "подозрение на патологию",
+      "pathology_localization_coords": {
+        "x_min": 0,
+        "x_max": 128,
+        "y_min": 0,
+        "y_max": 128,
+        "z_min": 2,
+        "z_max": 3,
+        "confidence": 0.9212417006492615
+      },
+      "heatmap_path": "/app/processed_studies/study_61/heatmaps",
+      "heatmap_format": "npy",
+      "heatmap_metadata": {
+        "statistics": {
+          "max_error": 0.9212417006492615,
+          "mean_error": 0.020417625084519386,
+          "std_error": 0.06074776500463486,
+          "percentile_95": 0.11229891702532768,
+          "percentile_99": 0.32764289528131485,
+          "total_error_volume": 21409.431640625
+        },
+        "verification": null,
+        "max_slice": 2,
+        "heatmap_data_info": {
+          "present": true,
+          "error_map_shape": [
+            128,
+            128,
+            64
+          ],
+          "max_error_slice_index": 2,
+          "has_visualization": true
+        },
+        "heatmap_statistics": {
+          "max_error": 0.9212417006492615,
+          "mean_error": 0.020417625084519386,
+          "std_error": 0.06074776500463486,
+          "percentile_95": 0.11229891702532768,
+          "percentile_99": 0.32764289528131485,
+          "total_error_volume": 21409.431640625
+        }
+      },
+      "total_instances": 1,
+      "series_count": 1,
+      "error_message": null,
+      "ready_for_inference": true,
+      "inference_completed": true,
+      "created_at": "2025-09-28T16:57:01.147400Z",
+      "updated_at": "2025-09-28T16:57:07.806662Z",
+      "needs_verification": false,
+      "verification_score": null,
+      "verification_warnings": [],
+      "heatmap_visualization_url": null,
+      "heatmap_data_info": {
+        "present": true,
+        "error_map_shape": [
+          128,
+          128,
+          64
+        ],
+        "max_error_slice_index": 2,
+        "has_visualization": true
+      },
+      "heatmap_statistics": {
+        "max_error": 0.9212417006492615,
+        "mean_error": 0.020417625084519386,
+        "std_error": 0.06074776500463486,
+        "percentile_95": 0.11229891702532768,
+        "percentile_99": 0.32764289528131485,
+        "total_error_volume": 21409.431640625
+      },
+      "needs_review": false
+    },
+    {
+      "filename": "pneumotorax_anon.zip",
+      "id": 60,
+      "user_id": 1,
+      "file_path": "/app/backend/uploads/1/pneumotorax_anon.zip",
+      "path_to_study": "/app/processed_studies/1.2.276.0.7230010.3.1.2.2462171185.19116.1754560222.2501",
+      "study_uid": "1.2.276.0.7230010.3.1.2.2462171185.19116.1754560222.2501",
+      "series_uid": "1.2.276.0.7230010.3.1.3.2462171185.19116.1754560222.2502",
+      "processing_status": "обработано",
+      "probability_of_pathology": 0.4423576370157131,
+      "pathology": 1,
+      "time_of_processing": 0,
+      "most_dangerous_pathology_type": "пневмония",
+      "pathology_localization_coords": {
+        "x_min": 0,
+        "x_max": 128,
+        "y_min": 0,
+        "y_max": 128,
+        "z_min": 2,
+        "z_max": 3,
+        "confidence": 0.9212417006492615
+      },
+      "heatmap_path": "/app/processed_studies/study_60/heatmaps",
+      "heatmap_format": "npy",
+      "heatmap_metadata": {
+        "statistics": {
+          "max_error": 0.9212417006492615,
+          "mean_error": 0.020417625084519386,
+          "std_error": 0.06074776500463486,
+          "percentile_95": 0.11229891702532768,
+          "percentile_99": 0.32764289528131485,
+          "total_error_volume": 21409.431640625
+        },
+        "verification": null,
+        "max_slice": 2,
+        "heatmap_data_info": {
+          "present": true,
+          "error_map_shape": [
+            128,
+            128,
+            64
+          ],
+          "max_error_slice_index": 2,
+          "has_visualization": true
+        },
+        "heatmap_statistics": {
+          "max_error": 0.9212417006492615,
+          "mean_error": 0.020417625084519386,
+          "std_error": 0.06074776500463486,
+          "percentile_95": 0.11229891702532768,
+          "percentile_99": 0.32764289528131485,
+          "total_error_volume": 21409.431640625
+        }
+      },
+      "total_instances": 1,
+      "series_count": 1,
+      "error_message": null,
+      "ready_for_inference": true,
+      "inference_completed": true,
+      "created_at": "2025-09-28T16:38:50.136174Z",
+      "updated_at": "2025-09-28T16:38:56.983187Z",
+      "needs_verification": false,
+      "verification_score": null,
+      "verification_warnings": [],
+      "heatmap_visualization_url": null,
+      "heatmap_data_info": {
+        "present": true,
+        "error_map_shape": [
+          128,
+          128,
+          64
+        ],
+        "max_error_slice_index": 2,
+        "has_visualization": true
+      },
+      "heatmap_statistics": {
+        "max_error": 0.9212417006492615,
+        "mean_error": 0.020417625084519386,
+        "std_error": 0.06074776500463486,
+        "percentile_95": 0.11229891702532768,
+        "percentile_99": 0.32764289528131485,
+        "total_error_volume": 21409.431640625
+      },
+      "needs_review": false
+    },
+    {
+      "filename": "pneumonia_anon.zip",
+      "id": 59,
+      "user_id": 1,
+      "file_path": "/app/backend/uploads/1/pneumonia_anon.zip",
+      "path_to_study": "/app/processed_studies/1.2.276.0.7230010.3.1.2.2462171185.19116.1754559747.125",
+      "study_uid": "1.2.276.0.7230010.3.1.2.2462171185.19116.1754559747.125",
+      "series_uid": "1.2.276.0.7230010.3.1.3.2462171185.19116.1754559747.126",
+      "processing_status": "обработано",
+      "probability_of_pathology": 0.5,
+      "pathology": 1,
+      "time_of_processing": 0,
+      "most_dangerous_pathology_type": "пневмония",
+      "pathology_localization_coords": {
+        "x_min": 0,
+        "x_max": 128,
+        "y_min": 0,
+        "y_max": 128,
+        "z_min": 53,
+        "z_max": 54,
+        "confidence": 0.9345313906669617
+      },
+      "heatmap_path": "/app/processed_studies/study_59/heatmaps",
+      "heatmap_format": "npy",
+      "heatmap_metadata": {
+        "statistics": {
+          "max_error": 0.9345313906669617,
+          "mean_error": 0.0221257247030735,
+          "std_error": 0.07196714729070663,
+          "percentile_95": 0.11935628205537796,
+          "percentile_99": 0.36371178925037384,
+          "total_error_volume": 23200.50390625
+        },
+        "verification": null,
+        "max_slice": 53,
+        "heatmap_data_info": {
+          "present": true,
+          "error_map_shape": [
+            128,
+            128,
+            64
+          ],
+          "max_error_slice_index": 53,
+          "has_visualization": true
+        },
+        "heatmap_statistics": {
+          "max_error": 0.9345313906669617,
+          "mean_error": 0.0221257247030735,
+          "std_error": 0.07196714729070663,
+          "percentile_95": 0.11935628205537796,
+          "percentile_99": 0.36371178925037384,
+          "total_error_volume": 23200.50390625
+        }
+      },
+      "total_instances": 367,
+      "series_count": 1,
+      "error_message": null,
+      "ready_for_inference": true,
+      "inference_completed": true,
+      "created_at": "2025-09-28T16:36:02.554550Z",
+      "updated_at": "2025-09-28T16:36:08.933955Z",
+      "needs_verification": false,
+      "verification_score": null,
+      "verification_warnings": [],
+      "heatmap_visualization_url": null,
+      "heatmap_data_info": {
+        "present": true,
+        "error_map_shape": [
+          128,
+          128,
+          64
+        ],
+        "max_error_slice_index": 53,
+        "has_visualization": true
+      },
+      "heatmap_statistics": {
+        "max_error": 0.9345313906669617,
+        "mean_error": 0.0221257247030735,
+        "std_error": 0.07196714729070663,
+        "percentile_95": 0.11935628205537796,
+        "percentile_99": 0.36371178925037384,
+        "total_error_volume": 23200.50390625
+      },
+      "needs_review": false
+    },
+    {
+      "filename": "norma_anon.zip",
+      "id": 58,
+      "user_id": 1,
+      "file_path": "/app/backend/uploads/1/norma_anon.zip",
+      "path_to_study": "/app/processed_studies/1.2.276.0.7230010.3.1.2.2462171185.19116.1754559949.863",
+      "study_uid": "1.2.276.0.7230010.3.1.2.2462171185.19116.1754559949.863",
+      "series_uid": "1.2.276.0.7230010.3.1.3.2462171185.19116.1754559949.864",
+      "processing_status": "требует_проверки",
+      "probability_of_pathology": 0.40371769831684184,
+      "pathology": 0,
+      "time_of_processing": 0,
+      "most_dangerous_pathology_type": "",
+      "pathology_localization_coords": null,
+      "heatmap_path": "/app/processed_studies/study_58/heatmaps",
+      "heatmap_format": "npy",
+      "heatmap_metadata": {
+        "statistics": {
+          "max_error": 0.8379271030426025,
+          "mean_error": 0.019249392673373222,
+          "std_error": 0.06392122805118561,
+          "percentile_95": 0.10366783104836941,
+          "percentile_99": 0.33969224989414215,
+          "total_error_volume": 20184.451171875
+        },
+        "verification": {
+          "достоверно": false,
+          "итоговый_коэффициент": 0.2,
+          "предупреждения": [
+            "Слишком резкие скачки внимания (коэф.: 6.12)",
+            "Модель следует за линейными артефактами (полосы сканирования)"
+          ],
+          "детали": {
+            "краевые_артефакты": {
+              "пройдено": true,
+              "множитель_доверия": 1,
+              "уровень_риска": "низкий",
+              "название_проверки": "краевые_артефакты"
+            },
+            "хаос_внимания": {
+              "пройдено": false,
+              "множитель_доверия": 0.5,
+              "уровень_риска": "средний",
+              "замечание": "Слишком резкие скачки внимания (коэф.: 6.12)",
+              "название_проверки": "хаос_внимания"
+            },
+            "подозрительные_паттерны": {
+              "пройдено": false,
+              "множитель_доверия": 0.4,
+              "уровень_риска": "высокий",
+              "замечание": "Модель следует за линейными артефактами (полосы сканирования)",
+              "название_проверки": "подозрительные_паттерны"
+            },
+            "качество_heatmap": {
+              "пройдено": true,
+              "множитель_доверия": 1,
+              "уровень_риска": "низкий",
+              "название_проверки": "качество_heatmap"
+            }
+          },
+          "уровень_риска": "высокий",
+          "проверенный_срез": 3,
+          "форма_heatmap": [
+            128,
+            128
+          ]
+        },
+        "max_slice": 3,
+        "heatmap_data_info": {
+          "present": true,
+          "error_map_shape": [
+            128,
+            128,
+            64
+          ],
+          "max_error_slice_index": 3,
+          "has_visualization": true
+        },
+        "heatmap_statistics": {
+          "max_error": 0.8379271030426025,
+          "mean_error": 0.019249392673373222,
+          "std_error": 0.06392122805118561,
+          "percentile_95": 0.10366783104836941,
+          "percentile_99": 0.33969224989414215,
+          "total_error_volume": 20184.451171875
+        }
+      },
+      "total_instances": 451,
+      "series_count": 1,
+      "error_message": null,
+      "ready_for_inference": true,
+      "inference_completed": true,
+      "created_at": "2025-09-28T16:29:26.357395Z",
+      "updated_at": "2025-09-28T16:29:32.683405Z",
+      "needs_verification": true,
+      "verification_score": null,
+      "verification_warnings": [],
+      "heatmap_visualization_url": null,
+      "heatmap_data_info": {
+        "present": true,
+        "error_map_shape": [
+          128,
+          128,
+          64
+        ],
+        "max_error_slice_index": 3,
+        "has_visualization": true
+      },
+      "heatmap_statistics": {
+        "max_error": 0.8379271030426025,
+        "mean_error": 0.019249392673373222,
+        "std_error": 0.06392122805118561,
+        "percentile_95": 0.10366783104836941,
+        "percentile_99": 0.33969224989414215,
+        "total_error_volume": 20184.451171875
+      },
+      "needs_review": true
+    },
+    {
+      "filename": "pneumotorax_anon.zip",
+      "id": 57,
+      "user_id": 1,
+      "file_path": "/app/backend/uploads/1/pneumotorax_anon.zip",
+      "path_to_study": "/app/processed_studies/1.2.276.0.7230010.3.1.2.2462171185.19116.1754560222.2501",
+      "study_uid": "1.2.276.0.7230010.3.1.2.2462171185.19116.1754560222.2501",
+      "series_uid": "1.2.276.0.7230010.3.1.3.2462171185.19116.1754560222.2502",
+      "processing_status": "требует_проверки",
+      "probability_of_pathology": 0.4423576370157131,
+      "pathology": 0,
+      "time_of_processing": 0,
+      "most_dangerous_pathology_type": "",
+      "pathology_localization_coords": null,
+      "heatmap_path": "/app/processed_studies/study_57/heatmaps",
+      "heatmap_format": "npy",
+      "heatmap_metadata": {
+        "statistics": {
+          "max_error": 0.9212417006492615,
+          "mean_error": 0.020417625084519386,
+          "std_error": 0.06074776500463486,
+          "percentile_95": 0.11229891702532768,
+          "percentile_99": 0.32764289528131485,
+          "total_error_volume": 21409.431640625
+        },
+        "verification": {
+          "достоверно": false,
+          "итоговый_коэффициент": 0.2,
+          "предупреждения": [
+            "Слишком резкие скачки внимания (коэф.: 4.93)",
+            "Модель следует за линейными артефактами (полосы сканирования)"
+          ],
+          "детали": {
+            "краевые_артефакты": {
+              "пройдено": true,
+              "множитель_доверия": 1,
+              "уровень_риска": "низкий",
+              "название_проверки": "краевые_артефакты"
+            },
+            "хаос_внимания": {
+              "пройдено": false,
+              "множитель_доверия": 0.5,
+              "уровень_риска": "средний",
+              "замечание": "Слишком резкие скачки внимания (коэф.: 4.93)",
+              "название_проверки": "хаос_внимания"
+            },
+            "подозрительные_паттерны": {
+              "пройдено": false,
+              "множитель_доверия": 0.4,
+              "уровень_риска": "высокий",
+              "замечание": "Модель следует за линейными артефактами (полосы сканирования)",
+              "название_проверки": "подозрительные_паттерны"
+            },
+            "качество_heatmap": {
+              "пройдено": true,
+              "множитель_доверия": 1,
+              "уровень_риска": "низкий",
+              "название_проверки": "качество_heatmap"
+            }
+          },
+          "уровень_риска": "высокий",
+          "проверенный_срез": 2,
+          "форма_heatmap": [
+            128,
+            128
+          ]
+        },
+        "max_slice": 2,
+        "heatmap_data_info": {
+          "present": true,
+          "error_map_shape": [
+            128,
+            128,
+            64
+          ],
+          "max_error_slice_index": 2,
+          "has_visualization": true
+        },
+        "heatmap_statistics": {
+          "max_error": 0.9212417006492615,
+          "mean_error": 0.020417625084519386,
+          "std_error": 0.06074776500463486,
+          "percentile_95": 0.11229891702532768,
+          "percentile_99": 0.32764289528131485,
+          "total_error_volume": 21409.431640625
+        }
+      },
+      "total_instances": 1,
+      "series_count": 1,
+      "error_message": null,
+      "ready_for_inference": true,
+      "inference_completed": true,
+      "created_at": "2025-09-28T16:25:37.941393Z",
+      "updated_at": "2025-09-28T16:25:44.856965Z",
+      "needs_verification": true,
+      "verification_score": null,
+      "verification_warnings": [],
+      "heatmap_visualization_url": null,
+      "heatmap_data_info": {
+        "present": true,
+        "error_map_shape": [
+          128,
+          128,
+          64
+        ],
+        "max_error_slice_index": 2,
+        "has_visualization": true
+      },
+      "heatmap_statistics": {
+        "max_error": 0.9212417006492615,
+        "mean_error": 0.020417625084519386,
+        "std_error": 0.06074776500463486,
+        "percentile_95": 0.11229891702532768,
+        "percentile_99": 0.32764289528131485,
+        "total_error_volume": 21409.431640625
+      },
+      "needs_review": true
+    },
+    {
+      "filename": "pneumonia_anon.zip",
+      "id": 56,
+      "user_id": 1,
+      "file_path": "/app/backend/uploads/1/pneumonia_anon.zip",
+      "path_to_study": "/app/processed_studies/1.2.276.0.7230010.3.1.2.2462171185.19116.1754559747.125",
+      "study_uid": "1.2.276.0.7230010.3.1.2.2462171185.19116.1754559747.125",
+      "series_uid": "1.2.276.0.7230010.3.1.3.2462171185.19116.1754559747.126",
+      "processing_status": "требует_проверки",
+      "probability_of_pathology": 0.5,
+      "pathology": 0,
+      "time_of_processing": 0,
+      "most_dangerous_pathology_type": "",
+      "pathology_localization_coords": null,
+      "heatmap_path": "/app/processed_studies/study_56/heatmaps",
+      "heatmap_format": "npy",
+      "heatmap_metadata": {
+        "statistics": {
+          "max_error": 0.9345313906669617,
+          "mean_error": 0.0221257247030735,
+          "std_error": 0.07196714729070663,
+          "percentile_95": 0.11935628205537796,
+          "percentile_99": 0.36371178925037384,
+          "total_error_volume": 23200.50390625
+        },
+        "verification": {
+          "достоверно": false,
+          "итоговый_коэффициент": 0.4,
+          "предупреждения": [
+            "Модель следует за линейными артефактами (полосы сканирования)"
+          ],
+          "детали": {
+            "краевые_артефакты": {
+              "пройдено": true,
+              "множитель_доверия": 1,
+              "уровень_риска": "низкий",
+              "название_проверки": "краевые_артефакты"
+            },
+            "хаос_внимания": {
+              "пройдено": true,
+              "множитель_доверия": 1,
+              "уровень_риска": "низкий",
+              "название_проверки": "хаос_внимания"
+            },
+            "подозрительные_паттерны": {
+              "пройдено": false,
+              "множитель_доверия": 0.4,
+              "уровень_риска": "высокий",
+              "замечание": "Модель следует за линейными артефактами (полосы сканирования)",
+              "название_проверки": "подозрительные_паттерны"
+            },
+            "качество_heatmap": {
+              "пройдено": true,
+              "множитель_доверия": 1,
+              "уровень_риска": "низкий",
+              "название_проверки": "качество_heatmap"
+            }
+          },
+          "уровень_риска": "высокий",
+          "проверенный_срез": 53,
+          "форма_heatmap": [
+            128,
+            128
+          ]
+        },
+        "max_slice": 53,
+        "heatmap_data_info": {
+          "present": true,
+          "error_map_shape": [
+            128,
+            128,
+            64
+          ],
+          "max_error_slice_index": 53,
+          "has_visualization": true
+        },
+        "heatmap_statistics": {
+          "max_error": 0.9345313906669617,
+          "mean_error": 0.0221257247030735,
+          "std_error": 0.07196714729070663,
+          "percentile_95": 0.11935628205537796,
+          "percentile_99": 0.36371178925037384,
+          "total_error_volume": 23200.50390625
+        }
+      },
+      "total_instances": 367,
+      "series_count": 1,
+      "error_message": null,
+      "ready_for_inference": true,
+      "inference_completed": true,
+      "created_at": "2025-09-28T16:19:59.096896Z",
+      "updated_at": "2025-09-28T16:20:05.341034Z",
+      "needs_verification": true,
+      "verification_score": null,
+      "verification_warnings": [],
+      "heatmap_visualization_url": null,
+      "heatmap_data_info": {
+        "present": true,
+        "error_map_shape": [
+          128,
+          128,
+          64
+        ],
+        "max_error_slice_index": 53,
+        "has_visualization": true
+      },
+      "heatmap_statistics": {
+        "max_error": 0.9345313906669617,
+        "mean_error": 0.0221257247030735,
+        "std_error": 0.07196714729070663,
+        "percentile_95": 0.11935628205537796,
+        "percentile_99": 0.36371178925037384,
+        "total_error_volume": 23200.50390625
+      },
+      "needs_review": true
+    },
+    {
+      "filename": "pneumonia_anon.zip",
+      "id": 55,
+      "user_id": 1,
+      "file_path": "/app/backend/uploads/1/pneumonia_anon.zip",
+      "path_to_study": "/app/processed_studies/1.2.276.0.7230010.3.1.2.2462171185.19116.1754559747.125",
+      "study_uid": "1.2.276.0.7230010.3.1.2.2462171185.19116.1754559747.125",
+      "series_uid": "1.2.276.0.7230010.3.1.3.2462171185.19116.1754559747.126",
+      "processing_status": "требует_проверки",
+      "probability_of_pathology": 0.26,
+      "pathology": 0,
+      "time_of_processing": 0,
+      "most_dangerous_pathology_type": "",
+      "pathology_localization_coords": null,
+      "heatmap_path": "/app/processed_studies/study_55/heatmaps",
+      "heatmap_format": "npy",
+      "heatmap_metadata": {
+        "statistics": {
+          "max_error": 0.9345313906669617,
+          "mean_error": 0.0221257247030735,
+          "std_error": 0.07196714729070663,
+          "percentile_95": 0.11935628205537796,
+          "percentile_99": 0.36371178925037384,
+          "total_error_volume": 23200.50390625
+        },
+        "verification": {
+          "достоверно": false,
+          "итоговый_коэффициент": 0.4,
+          "предупреждения": [
+            "Модель следует за линейными артефактами (полосы сканирования)"
+          ],
+          "детали": {
+            "краевые_артефакты": {
+              "пройдено": true,
+              "множитель_доверия": 1,
+              "уровень_риска": "низкий",
+              "название_проверки": "краевые_артефакты"
+            },
+            "хаос_внимания": {
+              "пройдено": true,
+              "множитель_доверия": 1,
+              "уровень_риска": "низкий",
+              "название_проверки": "хаос_внимания"
+            },
+            "подозрительные_паттерны": {
+              "пройдено": false,
+              "множитель_доверия": 0.4,
+              "уровень_риска": "высокий",
+              "замечание": "Модель следует за линейными артефактами (полосы сканирования)",
+              "название_проверки": "подозрительные_паттерны"
+            },
+            "качество_heatmap": {
+              "пройдено": true,
+              "множитель_доверия": 1,
+              "уровень_риска": "низкий",
+              "название_проверки": "качество_heatmap"
+            }
+          },
+          "уровень_риска": "высокий",
+          "проверенный_срез": 53,
+          "форма_heatmap": [
+            128,
+            128
+          ]
+        },
+        "max_slice": 53,
+        "heatmap_data_info": {
+          "present": true,
+          "error_map_shape": [
+            128,
+            128,
+            64
+          ],
+          "max_error_slice_index": 53,
+          "has_visualization": true
+        },
+        "heatmap_statistics": {
+          "max_error": 0.9345313906669617,
+          "mean_error": 0.0221257247030735,
+          "std_error": 0.07196714729070663,
+          "percentile_95": 0.11935628205537796,
+          "percentile_99": 0.36371178925037384,
+          "total_error_volume": 23200.50390625
+        }
+      },
+      "total_instances": 367,
+      "series_count": 1,
+      "error_message": null,
+      "ready_for_inference": true,
+      "inference_completed": true,
+      "created_at": "2025-09-28T15:59:18.065147Z",
+      "updated_at": "2025-09-28T15:59:24.589790Z",
+      "needs_verification": true,
+      "verification_score": null,
+      "verification_warnings": [],
+      "heatmap_visualization_url": null,
+      "heatmap_data_info": {
+        "present": true,
+        "error_map_shape": [
+          128,
+          128,
+          64
+        ],
+        "max_error_slice_index": 53,
+        "has_visualization": true
+      },
+      "heatmap_statistics": {
+        "max_error": 0.9345313906669617,
+        "mean_error": 0.0221257247030735,
+        "std_error": 0.07196714729070663,
+        "percentile_95": 0.11935628205537796,
+        "percentile_99": 0.36371178925037384,
+        "total_error_volume": 23200.50390625
+      },
+      "needs_review": true
+    },
+    {
+      "filename": "pneumonia_anon.zip",
+      "id": 54,
+      "user_id": 1,
+      "file_path": "/app/backend/uploads/1/pneumonia_anon.zip",
+      "path_to_study": "/app/processed_studies/1.2.276.0.7230010.3.1.2.2462171185.19116.1754559747.125",
+      "study_uid": "1.2.276.0.7230010.3.1.2.2462171185.19116.1754559747.125",
+      "series_uid": "1.2.276.0.7230010.3.1.3.2462171185.19116.1754559747.126",
+      "processing_status": "требует_проверки",
+      "probability_of_pathology": 0.26,
+      "pathology": 0,
+      "time_of_processing": 0,
+      "most_dangerous_pathology_type": "",
+      "pathology_localization_coords": null,
+      "heatmap_path": "/app/processed_studies/study_54/heatmaps",
+      "heatmap_format": "npy",
+      "heatmap_metadata": {
+        "statistics": {
+          "max_error": 0.9345313906669617,
+          "mean_error": 0.0221257247030735,
+          "std_error": 0.07196714729070663,
+          "percentile_95": 0.11935628205537796,
+          "percentile_99": 0.36371178925037384,
+          "total_error_volume": 23200.50390625
+        },
+        "verification": {
+          "достоверно": false,
+          "итоговый_коэффициент": 0.4,
+          "предупреждения": [
+            "Модель следует за линейными артефактами (полосы сканирования)"
+          ],
+          "детали": {
+            "краевые_артефакты": {
+              "пройдено": true,
+              "множитель_доверия": 1,
+              "уровень_риска": "низкий",
+              "название_проверки": "краевые_артефакты"
+            },
+            "хаос_внимания": {
+              "пройдено": true,
+              "множитель_доверия": 1,
+              "уровень_риска": "низкий",
+              "название_проверки": "хаос_внимания"
+            },
+            "подозрительные_паттерны": {
+              "пройдено": false,
+              "множитель_доверия": 0.4,
+              "уровень_риска": "высокий",
+              "замечание": "Модель следует за линейными артефактами (полосы сканирования)",
+              "название_проверки": "подозрительные_паттерны"
+            },
+            "качество_heatmap": {
+              "пройдено": true,
+              "множитель_доверия": 1,
+              "уровень_риска": "низкий",
+              "название_проверки": "качество_heatmap"
+            }
+          },
+          "уровень_риска": "высокий",
+          "проверенный_срез": 53,
+          "форма_heatmap": [
+            128,
+            128
+          ]
+        },
+        "max_slice": 53,
+        "heatmap_data_info": {
+          "present": true,
+          "error_map_shape": [
+            128,
+            128,
+            64
+          ],
+          "max_error_slice_index": 53,
+          "has_visualization": true
+        },
+        "heatmap_statistics": {
+          "max_error": 0.9345313906669617,
+          "mean_error": 0.0221257247030735,
+          "std_error": 0.07196714729070663,
+          "percentile_95": 0.11935628205537796,
+          "percentile_99": 0.36371178925037384,
+          "total_error_volume": 23200.50390625
+        }
+      },
+      "total_instances": 367,
+      "series_count": 1,
+      "error_message": null,
+      "ready_for_inference": true,
+      "inference_completed": true,
+      "created_at": "2025-09-28T15:53:50.152186Z",
+      "updated_at": "2025-09-28T15:53:56.163553Z",
+      "needs_verification": true,
+      "verification_score": null,
+      "verification_warnings": [],
+      "heatmap_visualization_url": null,
+      "heatmap_data_info": {
+        "present": true,
+        "error_map_shape": [
+          128,
+          128,
+          64
+        ],
+        "max_error_slice_index": 53,
+        "has_visualization": true
+      },
+      "heatmap_statistics": {
+        "max_error": 0.9345313906669617,
+        "mean_error": 0.0221257247030735,
+        "std_error": 0.07196714729070663,
+        "percentile_95": 0.11935628205537796,
+        "percentile_99": 0.36371178925037384,
+        "total_error_volume": 23200.50390625
+      },
+      "needs_review": true
+    },
+    {
+      "filename": "pneumonia_anon.zip",
+      "id": 53,
+      "user_id": 1,
+      "file_path": "/app/backend/uploads/1/pneumonia_anon.zip",
+      "path_to_study": "/app/processed_studies/1.2.276.0.7230010.3.1.2.2462171185.19116.1754559747.125",
+      "study_uid": "1.2.276.0.7230010.3.1.2.2462171185.19116.1754559747.125",
+      "series_uid": "1.2.276.0.7230010.3.1.3.2462171185.19116.1754559747.126",
+      "processing_status": "требует_проверки",
+      "probability_of_pathology": 0.26,
+      "pathology": 0,
+      "time_of_processing": 0,
+      "most_dangerous_pathology_type": "",
+      "pathology_localization_coords": null,
+      "heatmap_path": "/app/processed_studies/study_53/heatmaps",
+      "heatmap_format": "npy",
+      "heatmap_metadata": {
+        "statistics": {
+          "max_error": 0.9345313906669617,
+          "mean_error": 0.0221257247030735,
+          "std_error": 0.07196714729070663,
+          "percentile_95": 0.11935628205537796,
+          "percentile_99": 0.36371178925037384,
+          "total_error_volume": 23200.50390625
+        },
+        "verification": {
+          "достоверно": false,
+          "итоговый_коэффициент": 0.4,
+          "предупреждения": [
+            "Модель следует за линейными артефактами (полосы сканирования)"
+          ],
+          "детали": {
+            "краевые_артефакты": {
+              "пройдено": true,
+              "множитель_доверия": 1,
+              "уровень_риска": "низкий",
+              "название_проверки": "краевые_артефакты"
+            },
+            "хаос_внимания": {
+              "пройдено": true,
+              "множитель_доверия": 1,
+              "уровень_риска": "низкий",
+              "название_проверки": "хаос_внимания"
+            },
+            "подозрительные_паттерны": {
+              "пройдено": false,
+              "множитель_доверия": 0.4,
+              "уровень_риска": "высокий",
+              "замечание": "Модель следует за линейными артефактами (полосы сканирования)",
+              "название_проверки": "подозрительные_паттерны"
+            },
+            "качество_heatmap": {
+              "пройдено": true,
+              "множитель_доверия": 1,
+              "уровень_риска": "низкий",
+              "название_проверки": "качество_heatmap"
+            }
+          },
+          "уровень_риска": "высокий",
+          "проверенный_срез": 53,
+          "форма_heatmap": [
+            128,
+            128
+          ]
+        },
+        "max_slice": 53,
+        "heatmap_data_info": {
+          "present": true,
+          "error_map_shape": [
+            128,
+            128,
+            64
+          ],
+          "max_error_slice_index": 53,
+          "has_visualization": true
+        },
+        "heatmap_statistics": {
+          "max_error": 0.9345313906669617,
+          "mean_error": 0.0221257247030735,
+          "std_error": 0.07196714729070663,
+          "percentile_95": 0.11935628205537796,
+          "percentile_99": 0.36371178925037384,
+          "total_error_volume": 23200.50390625
+        }
+      },
+      "total_instances": 367,
+      "series_count": 1,
+      "error_message": null,
+      "ready_for_inference": true,
+      "inference_completed": true,
+      "created_at": "2025-09-28T15:50:18.292728Z",
+      "updated_at": "2025-09-28T15:50:24.414486Z",
+      "needs_verification": true,
+      "verification_score": null,
+      "verification_warnings": [],
+      "heatmap_visualization_url": null,
+      "heatmap_data_info": {
+        "present": true,
+        "error_map_shape": [
+          128,
+          128,
+          64
+        ],
+        "max_error_slice_index": 53,
+        "has_visualization": true
+      },
+      "heatmap_statistics": {
+        "max_error": 0.9345313906669617,
+        "mean_error": 0.0221257247030735,
+        "std_error": 0.07196714729070663,
+        "percentile_95": 0.11935628205537796,
+        "percentile_99": 0.36371178925037384,
+        "total_error_volume": 23200.50390625
+      },
+      "needs_review": true
+    },
+    {
+      "filename": "pneumotorax_anon.zip",
+      "id": 52,
+      "user_id": 1,
+      "file_path": "/app/backend/uploads/1/pneumotorax_anon.zip",
+      "path_to_study": "/app/processed_studies/1.2.276.0.7230010.3.1.2.2462171185.19116.1754560222.2501",
+      "study_uid": "1.2.276.0.7230010.3.1.2.2462171185.19116.1754560222.2501",
+      "series_uid": "1.2.276.0.7230010.3.1.3.2462171185.19116.1754560222.2502",
+      "processing_status": "требует_проверки",
+      "probability_of_pathology": 0.23684008580767288,
+      "pathology": 0,
+      "time_of_processing": 0,
+      "most_dangerous_pathology_type": "",
+      "pathology_localization_coords": null,
+      "heatmap_path": "/app/processed_studies/study_52/heatmaps",
+      "heatmap_format": "npy",
+      "heatmap_metadata": {
+        "statistics": {
+          "max_error": 0.9212417006492615,
+          "mean_error": 0.020417625084519386,
+          "std_error": 0.06074776500463486,
+          "percentile_95": 0.11229891702532768,
+          "percentile_99": 0.32764289528131485,
+          "total_error_volume": 21409.431640625
+        },
+        "verification": {
+          "достоверно": false,
+          "итоговый_коэффициент": 0.2,
+          "предупреждения": [
+            "Слишком резкие скачки внимания (коэф.: 4.93)",
+            "Модель следует за линейными артефактами (полосы сканирования)"
+          ],
+          "детали": {
+            "краевые_артефакты": {
+              "пройдено": true,
+              "множитель_доверия": 1,
+              "уровень_риска": "низкий",
+              "название_проверки": "краевые_артефакты"
+            },
+            "хаос_внимания": {
+              "пройдено": false,
+              "множитель_доверия": 0.5,
+              "уровень_риска": "средний",
+              "замечание": "Слишком резкие скачки внимания (коэф.: 4.93)",
+              "название_проверки": "хаос_внимания"
+            },
+            "подозрительные_паттерны": {
+              "пройдено": false,
+              "множитель_доверия": 0.4,
+              "уровень_риска": "высокий",
+              "замечание": "Модель следует за линейными артефактами (полосы сканирования)",
+              "название_проверки": "подозрительные_паттерны"
+            },
+            "качество_heatmap": {
+              "пройдено": true,
+              "множитель_доверия": 1,
+              "уровень_риска": "низкий",
+              "название_проверки": "качество_heatmap"
+            }
+          },
+          "уровень_риска": "высокий",
+          "проверенный_срез": 2,
+          "форма_heatmap": [
+            128,
+            128
+          ]
+        },
+        "max_slice": 2,
+        "heatmap_data_info": {
+          "present": true,
+          "error_map_shape": [
+            128,
+            128,
+            64
+          ],
+          "max_error_slice_index": 2,
+          "has_visualization": true
+        },
+        "heatmap_statistics": {
+          "max_error": 0.9212417006492615,
+          "mean_error": 0.020417625084519386,
+          "std_error": 0.06074776500463486,
+          "percentile_95": 0.11229891702532768,
+          "percentile_99": 0.32764289528131485,
+          "total_error_volume": 21409.431640625
+        }
+      },
+      "total_instances": 1,
+      "series_count": 1,
+      "error_message": null,
+      "ready_for_inference": true,
+      "inference_completed": true,
+      "created_at": "2025-09-28T15:48:26.084948Z",
+      "updated_at": "2025-09-28T15:48:33.192420Z",
+      "needs_verification": true,
+      "verification_score": null,
+      "verification_warnings": [],
+      "heatmap_visualization_url": null,
+      "heatmap_data_info": {
+        "present": true,
+        "error_map_shape": [
+          128,
+          128,
+          64
+        ],
+        "max_error_slice_index": 2,
+        "has_visualization": true
+      },
+      "heatmap_statistics": {
+        "max_error": 0.9212417006492615,
+        "mean_error": 0.020417625084519386,
+        "std_error": 0.06074776500463486,
+        "percentile_95": 0.11229891702532768,
+        "percentile_99": 0.32764289528131485,
+        "total_error_volume": 21409.431640625
+      },
+      "needs_review": true
+    },
+    {
+      "filename": "pneumotorax_anon.zip",
+      "id": 51,
+      "user_id": 1,
+      "file_path": "/app/backend/uploads/1/pneumotorax_anon.zip",
+      "path_to_study": "/app/processed_studies/1.2.276.0.7230010.3.1.2.2462171185.19116.1754560222.2501",
+      "study_uid": "1.2.276.0.7230010.3.1.2.2462171185.19116.1754560222.2501",
+      "series_uid": "1.2.276.0.7230010.3.1.3.2462171185.19116.1754560222.2502",
+      "processing_status": "требует_проверки",
+      "probability_of_pathology": 0.2768400858076729,
+      "pathology": 0,
+      "time_of_processing": 0,
+      "most_dangerous_pathology_type": "",
+      "pathology_localization_coords": null,
+      "heatmap_path": "/app/processed_studies/study_51/heatmaps",
+      "heatmap_format": "npy",
+      "heatmap_metadata": {
+        "statistics": {
+          "max_error": 0.9212417006492615,
+          "mean_error": 0.020417625084519386,
+          "std_error": 0.06074776500463486,
+          "percentile_95": 0.11229891702532768,
+          "percentile_99": 0.32764289528131485,
+          "total_error_volume": 21409.431640625
+        },
+        "verification": {
+          "достоверно": false,
+          "итоговый_коэффициент": 0.2,
+          "предупреждения": [
+            "Слишком резкие скачки внимания (коэф.: 4.93)",
+            "Модель следует за линейными артефактами (полосы сканирования)"
+          ],
+          "детали": {
+            "краевые_артефакты": {
+              "пройдено": true,
+              "множитель_доверия": 1,
+              "уровень_риска": "низкий",
+              "название_проверки": "краевые_артефакты"
+            },
+            "хаос_внимания": {
+              "пройдено": false,
+              "множитель_доверия": 0.5,
+              "уровень_риска": "средний",
+              "замечание": "Слишком резкие скачки внимания (коэф.: 4.93)",
+              "название_проверки": "хаос_внимания"
+            },
+            "подозрительные_паттерны": {
+              "пройдено": false,
+              "множитель_доверия": 0.4,
+              "уровень_риска": "высокий",
+              "замечание": "Модель следует за линейными артефактами (полосы сканирования)",
+              "название_проверки": "подозрительные_паттерны"
+            },
+            "качество_heatmap": {
+              "пройдено": true,
+              "множитель_доверия": 1,
+              "уровень_риска": "низкий",
+              "название_проверки": "качество_heatmap"
+            }
+          },
+          "уровень_риска": "высокий",
+          "проверенный_срез": 2,
+          "форма_heatmap": [
+            128,
+            128
+          ]
+        },
+        "max_slice": 2,
+        "heatmap_data_info": {
+          "present": true,
+          "error_map_shape": [
+            128,
+            128,
+            64
+          ],
+          "max_error_slice_index": 2,
+          "has_visualization": true
+        },
+        "heatmap_statistics": {
+          "max_error": 0.9212417006492615,
+          "mean_error": 0.020417625084519386,
+          "std_error": 0.06074776500463486,
+          "percentile_95": 0.11229891702532768,
+          "percentile_99": 0.32764289528131485,
+          "total_error_volume": 21409.431640625
+        }
+      },
+      "total_instances": 1,
+      "series_count": 1,
+      "error_message": null,
+      "ready_for_inference": true,
+      "inference_completed": true,
+      "created_at": "2025-09-28T15:30:54.271467Z",
+      "updated_at": "2025-09-28T15:31:01.607638Z",
+      "needs_verification": true,
+      "verification_score": null,
+      "verification_warnings": [],
+      "heatmap_visualization_url": null,
+      "heatmap_data_info": {
+        "present": true,
+        "error_map_shape": [
+          128,
+          128,
+          64
+        ],
+        "max_error_slice_index": 2,
+        "has_visualization": true
+      },
+      "heatmap_statistics": {
+        "max_error": 0.9212417006492615,
+        "mean_error": 0.020417625084519386,
+        "std_error": 0.06074776500463486,
+        "percentile_95": 0.11229891702532768,
+        "percentile_99": 0.32764289528131485,
+        "total_error_volume": 21409.431640625
+      },
+      "needs_review": true
+    },
+    {
+      "filename": "pneumonia_anon.zip",
+      "id": 50,
+      "user_id": 1,
+      "file_path": "/app/backend/uploads/1/pneumonia_anon.zip",
+      "path_to_study": "/app/processed_studies/1.2.276.0.7230010.3.1.2.2462171185.19116.1754559747.125",
+      "study_uid": "1.2.276.0.7230010.3.1.2.2462171185.19116.1754559747.125",
+      "series_uid": "1.2.276.0.7230010.3.1.3.2462171185.19116.1754559747.126",
+      "processing_status": "требует_проверки",
+      "probability_of_pathology": 0.5,
+      "pathology": 0,
+      "time_of_processing": 0,
+      "most_dangerous_pathology_type": "",
+      "pathology_localization_coords": null,
+      "heatmap_path": "/app/processed_studies/study_50/heatmaps",
+      "heatmap_format": "npy",
+      "heatmap_metadata": {
+        "statistics": {
+          "max_error": 0.9345313906669617,
+          "mean_error": 0.0221257247030735,
+          "std_error": 0.07196714729070663,
+          "percentile_95": 0.11935628205537796,
+          "percentile_99": 0.36371178925037384,
+          "total_error_volume": 23200.50390625
+        },
+        "verification": {
+          "достоверно": false,
+          "итоговый_коэффициент": 0.4,
+          "предупреждения": [
+            "Модель следует за линейными артефактами (полосы сканирования)"
+          ],
+          "детали": {
+            "краевые_артефакты": {
+              "пройдено": true,
+              "множитель_доверия": 1,
+              "уровень_риска": "низкий",
+              "название_проверки": "краевые_артефакты"
+            },
+            "хаос_внимания": {
+              "пройдено": true,
+              "множитель_доверия": 1,
+              "уровень_риска": "низкий",
+              "название_проверки": "хаос_внимания"
+            },
+            "подозрительные_паттерны": {
+              "пройдено": false,
+              "множитель_доверия": 0.4,
+              "уровень_риска": "высокий",
+              "замечание": "Модель следует за линейными артефактами (полосы сканирования)",
+              "название_проверки": "подозрительные_паттерны"
+            },
+            "качество_heatmap": {
+              "пройдено": true,
+              "множитель_доверия": 1,
+              "уровень_риска": "низкий",
+              "название_проверки": "качество_heatmap"
+            }
+          },
+          "уровень_риска": "высокий",
+          "проверенный_срез": 53,
+          "форма_heatmap": [
+            128,
+            128
+          ]
+        },
+        "max_slice": 53,
+        "heatmap_data_info": {
+          "present": true,
+          "error_map_shape": [
+            128,
+            128,
+            64
+          ],
+          "max_error_slice_index": 53,
+          "has_visualization": true
+        },
+        "heatmap_statistics": {
+          "max_error": 0.9345313906669617,
+          "mean_error": 0.0221257247030735,
+          "std_error": 0.07196714729070663,
+          "percentile_95": 0.11935628205537796,
+          "percentile_99": 0.36371178925037384,
+          "total_error_volume": 23200.50390625
+        }
+      },
+      "total_instances": 367,
+      "series_count": 1,
+      "error_message": null,
+      "ready_for_inference": true,
+      "inference_completed": true,
+      "created_at": "2025-09-28T13:53:07.008760Z",
+      "updated_at": "2025-09-28T13:53:13.002966Z",
+      "needs_verification": true,
+      "verification_score": null,
+      "verification_warnings": [],
+      "heatmap_visualization_url": null,
+      "heatmap_data_info": {
+        "present": true,
+        "error_map_shape": [
+          128,
+          128,
+          64
+        ],
+        "max_error_slice_index": 53,
+        "has_visualization": true
+      },
+      "heatmap_statistics": {
+        "max_error": 0.9345313906669617,
+        "mean_error": 0.0221257247030735,
+        "std_error": 0.07196714729070663,
+        "percentile_95": 0.11935628205537796,
+        "percentile_99": 0.36371178925037384,
+        "total_error_volume": 23200.50390625
+      },
+      "needs_review": true
+    },
+    {
+      "filename": "pneumonia_anon.zip",
+      "id": 49,
+      "user_id": 1,
+      "file_path": "/app/backend/uploads/1/pneumonia_anon.zip",
+      "path_to_study": "/app/processed_studies/1.2.276.0.7230010.3.1.2.2462171185.19116.1754559747.125",
+      "study_uid": "1.2.276.0.7230010.3.1.2.2462171185.19116.1754559747.125",
+      "series_uid": "1.2.276.0.7230010.3.1.3.2462171185.19116.1754559747.126",
+      "processing_status": "ошибка",
+      "probability_of_pathology": 0,
+      "pathology": 0,
+      "time_of_processing": 0,
+      "most_dangerous_pathology_type": "",
+      "pathology_localization_coords": null,
+      "heatmap_path": "",
+      "heatmap_format": "",
+      "heatmap_metadata": {
+        "statistics": {},
+        "verification": null,
+        "max_slice": 0,
+        "heatmap_data_info": {
+          "present": false,
+          "error_map_shape": [],
+          "max_error_slice_index": 0,
+          "has_visualization": false
+        },
+        "heatmap_statistics": {}
+      },
+      "total_instances": 367,
+      "series_count": 1,
+      "error_message": null,
+      "ready_for_inference": true,
+      "inference_completed": false,
+      "created_at": "2025-09-28T13:06:32.626030Z",
+      "updated_at": "2025-09-28T13:06:38.530052Z",
+      "needs_verification": false,
+      "verification_score": null,
+      "verification_warnings": [],
+      "heatmap_visualization_url": null,
+      "heatmap_data_info": {
+        "present": false,
+        "error_map_shape": [],
+        "max_error_slice_index": 0,
+        "has_visualization": false
+      },
+      "heatmap_statistics": {},
+      "needs_review": false
+    },
+    {
+      "filename": "pneumonia_anon.zip",
+      "id": 48,
+      "user_id": 1,
+      "file_path": "/app/backend/uploads/1/pneumonia_anon.zip",
+      "path_to_study": "/app/processed_studies/1.2.276.0.7230010.3.1.2.2462171185.19116.1754559747.125",
+      "study_uid": "1.2.276.0.7230010.3.1.2.2462171185.19116.1754559747.125",
+      "series_uid": "1.2.276.0.7230010.3.1.3.2462171185.19116.1754559747.126",
+      "processing_status": "ошибка",
+      "probability_of_pathology": 0,
+      "pathology": 0,
+      "time_of_processing": 0,
+      "most_dangerous_pathology_type": "",
+      "pathology_localization_coords": null,
+      "heatmap_path": "",
+      "heatmap_format": "",
+      "heatmap_metadata": {
+        "statistics": {},
+        "verification": null,
+        "max_slice": 0,
+        "heatmap_data_info": {
+          "present": false,
+          "error_map_shape": [],
+          "max_error_slice_index": 0,
+          "has_visualization": false
+        },
+        "heatmap_statistics": {}
+      },
+      "total_instances": 367,
+      "series_count": 1,
+      "error_message": null,
+      "ready_for_inference": true,
+      "inference_completed": false,
+      "created_at": "2025-09-28T13:00:19.846393Z",
+      "updated_at": "2025-09-28T13:00:25.849664Z",
+      "needs_verification": false,
+      "verification_score": null,
+      "verification_warnings": [],
+      "heatmap_visualization_url": null,
+      "heatmap_data_info": {
+        "present": false,
+        "error_map_shape": [],
+        "max_error_slice_index": 0,
+        "has_visualization": false
+      },
+      "heatmap_statistics": {},
+      "needs_review": false
+    },
+    {
+      "filename": "pneumonia_anon.zip",
+      "id": 47,
+      "user_id": 1,
+      "file_path": "/app/backend/uploads/1/pneumonia_anon.zip",
+      "path_to_study": "/app/processed_studies/1.2.276.0.7230010.3.1.2.2462171185.19116.1754559747.125",
+      "study_uid": "1.2.276.0.7230010.3.1.2.2462171185.19116.1754559747.125",
+      "series_uid": "1.2.276.0.7230010.3.1.3.2462171185.19116.1754559747.126",
+      "processing_status": "ошибка",
+      "probability_of_pathology": 0,
+      "pathology": 0,
+      "time_of_processing": 0,
+      "most_dangerous_pathology_type": "",
+      "pathology_localization_coords": null,
+      "heatmap_path": "",
+      "heatmap_format": "",
+      "heatmap_metadata": {
+        "statistics": {},
+        "verification": null,
+        "max_slice": 0,
+        "heatmap_data_info": {
+          "present": false,
+          "error_map_shape": [],
+          "max_error_slice_index": 0,
+          "has_visualization": false
+        },
+        "heatmap_statistics": {}
+      },
+      "total_instances": 367,
+      "series_count": 1,
+      "error_message": null,
+      "ready_for_inference": true,
+      "inference_completed": false,
+      "created_at": "2025-09-28T12:47:36.109605Z",
+      "updated_at": "2025-09-28T12:47:42.073178Z",
+      "needs_verification": false,
+      "verification_score": null,
+      "verification_warnings": [],
+      "heatmap_visualization_url": null,
+      "heatmap_data_info": {
+        "present": false,
+        "error_map_shape": [],
+        "max_error_slice_index": 0,
+        "has_visualization": false
+      },
+      "heatmap_statistics": {},
+      "needs_review": false
+    },
+    {
+      "filename": "pneumonia_anon.zip",
+      "id": 46,
+      "user_id": 1,
+      "file_path": "/app/backend/uploads/1/pneumonia_anon.zip",
+      "path_to_study": "/app/processed_studies/1.2.276.0.7230010.3.1.2.2462171185.19116.1754559747.125",
+      "study_uid": "1.2.276.0.7230010.3.1.2.2462171185.19116.1754559747.125",
+      "series_uid": "1.2.276.0.7230010.3.1.3.2462171185.19116.1754559747.126",
+      "processing_status": "ошибка",
+      "probability_of_pathology": 0,
+      "pathology": 0,
+      "time_of_processing": 0,
+      "most_dangerous_pathology_type": "",
+      "pathology_localization_coords": null,
+      "heatmap_path": "",
+      "heatmap_format": "",
+      "heatmap_metadata": {
+        "statistics": {},
+        "verification": null,
+        "max_slice": 0,
+        "heatmap_data_info": {
+          "present": false,
+          "error_map_shape": [],
+          "max_error_slice_index": 0,
+          "has_visualization": false
+        },
+        "heatmap_statistics": {}
+      },
+      "total_instances": 367,
+      "series_count": 1,
+      "error_message": null,
+      "ready_for_inference": true,
+      "inference_completed": false,
+      "created_at": "2025-09-28T12:34:37.706501Z",
+      "updated_at": "2025-09-28T12:34:43.870038Z",
+      "needs_verification": false,
+      "verification_score": null,
+      "verification_warnings": [],
+      "heatmap_visualization_url": null,
+      "heatmap_data_info": {
+        "present": false,
+        "error_map_shape": [],
+        "max_error_slice_index": 0,
+        "has_visualization": false
+      },
+      "heatmap_statistics": {},
+      "needs_review": false
+    },
+    {
+      "filename": "pneumonia_anon.zip",
+      "id": 45,
+      "user_id": 1,
+      "file_path": "/app/backend/uploads/1/pneumonia_anon.zip",
+      "path_to_study": "/app/processed_studies/1.2.276.0.7230010.3.1.2.2462171185.19116.1754559747.125",
+      "study_uid": "1.2.276.0.7230010.3.1.2.2462171185.19116.1754559747.125",
+      "series_uid": "1.2.276.0.7230010.3.1.3.2462171185.19116.1754559747.126",
+      "processing_status": "требует_проверки",
+      "probability_of_pathology": 0.5,
+      "pathology": 0,
+      "time_of_processing": 0,
+      "most_dangerous_pathology_type": "",
+      "pathology_localization_coords": null,
+      "heatmap_path": "/app/processed_studies/study_45/heatmaps",
+      "heatmap_format": "npy",
+      "heatmap_metadata": {
+        "statistics": {
+          "max_error": 0.9345313906669617,
+          "mean_error": 0.0221257247030735,
+          "std_error": 0.07196714729070663,
+          "percentile_95": 0.11935628205537796,
+          "percentile_99": 0.36371178925037384,
+          "total_error_volume": 23200.50390625
+        },
+        "verification": {
+          "достоверно": false,
+          "итоговый_коэффициент": 0,
+          "предупреждения": [
+            "Heatmap данные отсутствуют"
+          ],
+          "детали": {},
+          "уровень_риска": "высокий",
+          "ошибка": true
+        },
+        "max_slice": 53,
+        "heatmap_data_info": {
+          "present": true,
+          "error_map_shape": [],
+          "max_error_slice_index": 0,
+          "has_visualization": false
+        },
+        "heatmap_statistics": {}
+      },
+      "total_instances": 367,
+      "series_count": 1,
+      "error_message": null,
+      "ready_for_inference": true,
+      "inference_completed": true,
+      "created_at": "2025-09-28T12:11:20.652836Z",
+      "updated_at": "2025-09-28T12:11:27.091662Z",
+      "needs_verification": true,
+      "verification_score": null,
+      "verification_warnings": [],
+      "heatmap_visualization_url": null,
+      "heatmap_data_info": {
+        "present": true,
+        "error_map_shape": [],
+        "max_error_slice_index": 0,
+        "has_visualization": false
+      },
+      "heatmap_statistics": {},
+      "needs_review": true
+    },
+    {
+      "filename": "norma_anon.zip",
+      "id": 44,
+      "user_id": 1,
+      "file_path": "/app/backend/uploads/1/norma_anon.zip",
+      "path_to_study": "/app/processed_studies/1.2.276.0.7230010.3.1.2.2462171185.19116.1754559949.863",
+      "study_uid": "1.2.276.0.7230010.3.1.2.2462171185.19116.1754559949.863",
+      "series_uid": "1.2.276.0.7230010.3.1.3.2462171185.19116.1754559949.864",
+      "processing_status": "требует_проверки",
+      "probability_of_pathology": 0.40371769831684184,
+      "pathology": 0,
+      "time_of_processing": 0,
+      "most_dangerous_pathology_type": "",
+      "pathology_localization_coords": null,
+      "heatmap_path": "/app/processed_studies/study_44/heatmaps",
+      "heatmap_format": "npy",
+      "heatmap_metadata": {
+        "statistics": {
+          "max_error": 0.8379271030426025,
+          "mean_error": 0.019249392673373222,
+          "std_error": 0.06392122805118561,
+          "percentile_95": 0.10366783104836941,
+          "percentile_99": 0.33969224989414215,
+          "total_error_volume": 20184.451171875
+        },
+        "verification": {
+          "достоверно": false,
+          "итоговый_коэффициент": 0,
+          "предупреждения": [
+            "Heatmap данные отсутствуют"
+          ],
+          "детали": {},
+          "уровень_риска": "высокий",
+          "ошибка": true
+        },
+        "max_slice": 3,
+        "heatmap_data_info": {
+          "present": true,
+          "error_map_shape": [],
+          "max_error_slice_index": 0,
+          "has_visualization": false
+        },
+        "heatmap_statistics": {}
+      },
+      "total_instances": 451,
+      "series_count": 1,
+      "error_message": null,
+      "ready_for_inference": true,
+      "inference_completed": true,
+      "created_at": "2025-09-28T12:09:56.393275Z",
+      "updated_at": "2025-09-28T12:10:03.990087Z",
+      "needs_verification": true,
+      "verification_score": null,
+      "verification_warnings": [],
+      "heatmap_visualization_url": null,
+      "heatmap_data_info": {
+        "present": true,
+        "error_map_shape": [],
+        "max_error_slice_index": 0,
+        "has_visualization": false
+      },
+      "heatmap_statistics": {},
+      "needs_review": true
+    }
+  ],
+  "total": 22,
+  "page": 1,
+  "per_page": 20,
+  "total_pages": 2
+}

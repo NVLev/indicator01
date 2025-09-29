@@ -1,4 +1,3 @@
-
 from typing import Optional, List, Dict, Any
 from xmlrpc.client import boolean
 from datetime import timedelta
@@ -107,9 +106,9 @@ class Study(Base):
     pathology_localization_coords: Mapped[Optional[dict]] = mapped_column(JSON)  # {x_min: 10, x_max: 20, ...}
 
     # Heatmap.  Пока непонятно, в каком виде, поэтому делется на все файлы)
-    heatmap_path: Mapped[Optional[str]] = mapped_column(String(500))  # Path to heatmap file (PNG/NPY)
-    heatmap_format: Mapped[Optional[str]] = mapped_column(String(20))  # "png", "npy", "json", etc.
-    heatmap_metadata: Mapped[Optional[dict]] = mapped_column(JSON)  # Доп. информация  (размеры, etc.)
+    heatmap_path: Mapped[Optional[str]] = mapped_column(String(500))
+    heatmap_format: Mapped[Optional[str]] = mapped_column(String(20))
+    heatmap_metadata: Mapped[Optional[dict]] = mapped_column(JSON)
 
     # Доп. метадата
     total_instances: Mapped[Optional[int]] = mapped_column(Integer)  # Количество файлов DICOM
@@ -127,6 +126,11 @@ class Study(Base):
     # статусы обработки ML
     ready_for_inference: Mapped[bool] = mapped_column(Boolean, default=False, index=True)
     inference_completed: Mapped[bool] = mapped_column(Boolean, default=False)
+
+    # Поля для верификации
+    needs_verification: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    verification_results: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)
+    verification_score: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
 
     # Relationships
     user: Mapped["User"] = relationship("User", back_populates="studies")

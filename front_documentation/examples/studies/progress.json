@@ -1,0 +1,9 @@
+{
+  "study_id": 63,
+  "celery_task_id": "2b22ca90-33fb-4239-8407-d0c18badd0d6",
+  "celery_state": "SUCCESS",
+  "status": "завершено",
+  "progress": 100,
+  "message": "Обработка завершена успешно",
+  "result_available": true
+}
