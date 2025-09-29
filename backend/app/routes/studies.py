@@ -19,7 +19,7 @@ logger = logging.getLogger(__name__)
 
 
 router = APIRouter(prefix="/studies", tags=["Исследования"])
-
+demo_router = APIRouter(prefix="/demo", tags=["Демо"])
 
 @router.post("/upload", response_model=StudyResponse, summary="Загрузить исследование")
 async def upload_study(
@@ -103,7 +103,7 @@ async def upload_study(
             "inference_completed": study.inference_completed,
             "created_at": study.created_at,
             "updated_at": study.updated_at,
-            "heatmap_visualization_url": f"/api/studies/{study.id}/heatmap"
+            "heatmap_visualization_url": f"/studies/{study.id}/heatmap"
         }
         return StudyResponse(**study_data)
 
@@ -175,7 +175,7 @@ async def get_study(
         )
     study_response = StudyResponse.model_validate(study)
     study_dict = study_response.model_dump()
-    study_dict["heatmap_visualization_url"] = f"/api/studies/{study_id}/heatmap"
+    study_dict["heatmap_visualization_url"] = f"/studies/{study_id}/heatmap"
     return study_dict
 
 
@@ -495,3 +495,4 @@ async def delete_study(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Ошибка удаления: {str(e)}"
         )
+

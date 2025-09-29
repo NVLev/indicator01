@@ -1,0 +1,149 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div style="max-width: 800px; margin: 0 auto;">
+    <h1>🧠 ИИ-сервис анализа КТ ОГК - Демо</h1>
+
+    <div style="background: #e8f5e8; padding: 20px; border-radius: 8px; margin: 20px 0;">
+        <h2>✅ Демо-режим активен</h2>
+        <p>Демо-пользователь создан и готов к работе.</p>
+    </div>
+
+    <div class="upload-section" style="background: #f8f9fa; padding: 20px; border-radius: 8px; margin: 20px 0;">
+        <h2>📤 Загрузить исследование</h2>
+
+        <!-- ФОРМА С JavaScript ДЛЯ АВТОРИЗАЦИИ -->
+        <form id="uploadForm" enctype="multipart/form-data">
+            <div style="margin: 15px 0;">
+                <label for="file" style="display: block; margin-bottom: 8px; font-weight: bold;">
+                    Выберите ZIP архив с DICOM файлами:
+                </label>
+                <input type="file" id="file" name="file" accept=".zip" required
+                       style="padding: 10px; border: 2px dashed #ccc; border-radius: 5px; width: 100%;">
+            </div>
+            <button type="submit"
+                    style="background: #007bff; color: white; padding: 12px 24px; border: none; border-radius: 5px; cursor: pointer;">
+                📤 Загрузить и проанализировать
+            </button>
+        </form>
+
+        <div id="uploadStatus" style="margin-top: 15px; display: none;"></div>
+
+        <div style="margin-top: 15px; padding: 15px; background: #fff3cd; border-radius: 5px;">
+            <p><strong>Как это работает:</strong></p>
+            <ol style="margin: 10px 0; padding-left: 20px;">
+                <li>Загрузите ZIP файл через форму выше</li>
+                <li>Система автоматически обработает его через существующие эндпоинты</li>
+                <li>Перейдите на <a href="/demo/results">страницу результатов</a> чтобы отслеживать прогресс</li>
+                <li>Просматривайте детали, heatmap и скачивайте отчеты</li>
+            </ol>
+        </div>
+    </div>
+
+    <div style="text-align: center; margin: 30px 0;">
+        <a href="/demo/results" style="background: #28a745; color: white; padding: 15px 30px; text-decoration: none; border-radius: 5px; display: inline-block; margin: 0 10px;">
+            📋 Посмотреть все результаты
+        </a>
+        <a href="/docs" style="background: #6c757d; color: white; padding: 15px 30px; text-decoration: none; border-radius: 5px; display: inline-block; margin: 0 10px;">
+            📖 API Документация
+        </a>
+    </div>
+</div>
+
+<script>
+// Глобальная переменная для хранения токена
+let demoToken = '{{ demo_token }}';
+
+// Функция для получения токена, если он не передан в шаблоне
+async function getDemoToken() {
+    if (demoToken && demoToken !== 'None') {
+        return demoToken;
+    }
+
+    try {
+        const response = await fetch('/demo/token');
+        if (response.ok) {
+            const data = await response.json();
+            demoToken = data.access_token;
+            return demoToken;
+        }
+    } catch (error) {
+        console.error('Ошибка получения токена:', error);
+    }
+    return null;
+}
+
+// Обработчик отправки формы
+document.getElementById('uploadForm').addEventListener('submit', async function(e) {
+    e.preventDefault();
+
+    const fileInput = document.getElementById('file');
+    const statusDiv = document.getElementById('uploadStatus');
+    const submitButton = this.querySelector('button[type="submit"]');
+
+    if (!fileInput.files.length) {
+        alert('Пожалуйста, выберите файл');
+        return;
+    }
+
+    // Получаем токен
+    const token = await getDemoToken();
+    if (!token) {
+        statusDiv.style.display = 'block';
+        statusDiv.innerHTML = '<div style="background: #f8d7da; color: #721c24; padding: 10px; border-radius: 5px;">❌ Ошибка: Не удалось получить токен авторизации</div>';
+        return;
+    }
+
+    const formData = new FormData();
+    formData.append('file', fileInput.files[0]);
+
+    // Показываем статус загрузки
+    statusDiv.style.display = 'block';
+    statusDiv.innerHTML = '<div style="background: #d4edda; color: #155724; padding: 10px; border-radius: 5px;">⏳ Загрузка файла...</div>';
+    submitButton.disabled = true;
+    submitButton.textContent = '📤 Загрузка...';
+
+    try {
+        // Отправляем запрос с авторизацией
+        const response = await fetch('/studies/upload', {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${token}`
+            },
+            body: formData
+        });
+
+        if (response.ok) {
+            const result = await response.json();
+            statusDiv.innerHTML = `<div style="background: #d4edda; color: #155724; padding: 10px; border-radius: 5px;">
+                ✅ Файл успешно загружен! ID исследования: ${result.id}
+                <br><a href="/demo/results" style="color: #155724; text-decoration: underline;">Перейти к результатам</a>
+            </div>`;
+
+            // Очищаем форму
+            fileInput.value = '';
+        } else {
+            const errorText = await response.text();
+            let errorMessage = 'Неизвестная ошибка';
+            try {
+                const errorJson = JSON.parse(errorText);
+                errorMessage = errorJson.detail || errorText;
+            } catch {
+                errorMessage = errorText;
+            }
+
+            statusDiv.innerHTML = `<div style="background: #f8d7da; color: #721c24; padding: 10px; border-radius: 5px;">
+                ❌ Ошибка загрузки: ${errorMessage}
+            </div>`;
+        }
+    } catch (error) {
+        statusDiv.innerHTML = `<div style="background: #f8d7da; color: #721c24; padding: 10px; border-radius: 5px;">
+            ❌ Ошибка сети: ${error.message}
+        </div>`;
+    } finally {
+        submitButton.disabled = false;
+        submitButton.textContent = '📤 Загрузить и проанализировать';
+    }
+});
+</script>
+{% endblock %}

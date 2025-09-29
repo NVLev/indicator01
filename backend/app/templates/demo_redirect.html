@@ -1,0 +1,20 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div style="text-align: center; padding: 40px 0;">
+    <h1>✅ {{ message }}</h1>
+    <p>Исследование успешно загружено и отправлено на анализ</p>
+    <p>Через несколько секунд вы будете перенаправлены на страницу результатов...</p>
+
+    <div style="margin: 20px 0;">
+        <a href="/demo/studies/{{ study_id }}" class="btn">Перейти сейчас</a>
+        <a href="/demo/results" class="btn">К списку исследований</a>
+    </div>
+</div>
+
+<script>
+setTimeout(() => {
+    window.location.href = "/demo/studies/{{ study_id }}";
+}, 3000);
+</script>
+{% endblock %}

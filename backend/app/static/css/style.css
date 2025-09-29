@@ -1,0 +1,56 @@
+body {
+    font-family: Arial, sans-serif;
+    margin: 0;
+    padding: 20px;
+    background: #f8f9fa;
+}
+
+nav {
+    background: #2c3e50;
+    padding: 15px;
+    margin-bottom: 20px;
+}
+
+nav a {
+    color: white;
+    text-decoration: none;
+    margin-right: 20px;
+    padding: 5px 10px;
+}
+
+nav a:hover {
+    background: #34495e;
+    border-radius: 3px;
+}
+
+.study {
+    border: 1px solid #ddd;
+    padding: 15px;
+    margin: 10px 0;
+    border-radius: 5px;
+    background: white;
+}
+
+.pathology {
+    border-left: 4px solid #e53935;
+    background: #ffebee;
+}
+
+.normal {
+    border-left: 4px solid #43a047;
+    background: #e8f5e8;
+}
+
+.btn {
+    background: #3498db;
+    color: white;
+    padding: 8px 15px;
+    text-decoration: none;
+    border-radius: 3px;
+    margin-right: 10px;
+    display: inline-block;
+}
+
+.btn:hover {
+    background: #2980b9;
+}

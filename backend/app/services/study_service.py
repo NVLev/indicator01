@@ -605,6 +605,56 @@ class StudyService:
             return []
 
 
+#----------БЛОК ДЛЯ ДЕМО РЕЖИМА---------------------------
+    @classmethod
+    async def create_demo_study(
+            cls,
+            filename: str,
+            file_path: str,
+            session: AsyncSession
+    ) -> Study:
+        """Создать исследование для демо-режима (без привязки к пользователю)"""
+        try:
+            study = Study(
+                # user_id=None,  # Если поле nullable=True
+                user_id=1,  # Или используем фиктивный ID
+                filename=filename,
+                file_path=file_path,
+                processing_status=StudyStatus.UPLOADED,
+                created_at=func.now(),
+                updated_at=func.now()
+            )
+            session.add(study)
+            await session.commit()
+            await session.refresh(study)
+            logger.info(f"Создано демо-исследование id={study.id}")
+            return study
+        except Exception as e:
+            await session.rollback()
+            logger.exception(f"Ошибка при создании демо-исследования: {e}")
+            raise
+    @classmethod
+    async def get_all_studies(cls, session: AsyncSession, limit: int = 100):
+        """Получить все исследования (для демо)"""
+        from sqlalchemy import select
+        from app.core.models import Study
+
+        stmt = select(Study).order_by(Study.created_at.desc()).limit(limit)
+        result = await session.execute(stmt)
+        return result.scalars().all()
+
+    @classmethod
+    async def get_study_by_id(cls, study_id: int, session: AsyncSession):
+        """Получить исследование по ID без проверки пользователя"""
+        from sqlalchemy import select
+        from app.core.models import Study
+
+        stmt = select(Study).where(Study.id == study_id)
+        result = await session.execute(stmt)
+        return result.scalar_one_or_none()
+
+#-------------КОНЕЦ БЛОКА---------------------------------------------
+
 def create_excel_report(processing_results: List[Dict[str, Any]], output_path: str) -> str:
     """Формирует улучшенный Excel-отчет в формате ТЗ с форматированием."""
     import pandas as pd

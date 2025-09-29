@@ -1,0 +1,438 @@
+{% extends "base.html" %}
+
+{% block title %}Исследование #{{ study_id }} - Демо{% endblock %}
+
+{% block content %}
+<div style="max-width: 1000px; margin: 0 auto;">
+    <h1 id="studyTitle">Исследование #{{ study_id }}</h1>
+
+    <div id="loadingMessage" style="text-align: center; padding: 40px;">
+        <div style="color: #666;">⏳ Загрузка данных исследования...</div>
+    </div>
+
+    <div id="studyContent" style="display: none;">
+        <div class="study-info" style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin: 20px 0;">
+            <div class="card" style="background: #f8f9fa; padding: 20px; border-radius: 8px;">
+                <h3>📊 Основные результаты</h3>
+                <table style="width: 100%;" id="studyTable">
+                    <!-- Данные будут заполнены через JavaScript -->
+                </table>
+            </div>
+
+            <div class="card" style="background: #f8f9fa; padding: 20px; border-radius: 8px;">
+                <h3>🖼️ Визуализация</h3>
+                <div id="heatmapContainer">
+                    <img id="heatmapImage"
+                         alt="Heatmap визуализация"
+                         style="max-width: 100%; border: 1px solid #ddd; border-radius: 5px; display: none;">
+                    <div id="heatmapLoading">Загрузка heatmap...</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="actions" style="text-align: center; margin: 30px 0;">
+            <button id="excelBtn"
+                    style="background: #28a745; color: white; padding: 12px 24px; border: none; border-radius: 5px; margin: 0 10px; cursor: pointer;">
+                📊 Скачать Excel отчет
+            </button>
+            <button id="heatmapBtn"
+                    style="background: #17a2b8; color: white; padding: 12px 24px; border: none; border-radius: 5px; margin: 0 10px; cursor: pointer;">
+                🖼️ Показать Heatmap
+            </button>
+            <a href="/demo/results"
+               style="background: #6c757d; color: white; padding: 12px 24px; text-decoration: none; border-radius: 5px; margin: 0 10px;">
+                📋 К списку исследований
+            </a>
+            <a href="/demo"
+               style="background: #007bff; color: white; padding: 12px 24px; text-decoration: none; border-radius: 5px; margin: 0 10px;">
+                🏠 На главную
+            </a>
+        </div>
+
+        <div id="actionStatus" style="margin: 20px 0; display: none;"></div>
+
+        <div id="localizationSection" style="display: none;">
+            <!-- Блок локализации будет показан при наличии данных -->
+        </div>
+    </div>
+
+    <div id="errorMessage" style="display: none;"></div>
+</div>
+
+<script>
+const studyId = {{ study_id }};
+const demoToken = '{{ demo_token }}';
+
+// Загрузка данных исследования
+async function loadStudyDetails() {
+    try {
+        const response = await fetch(`/studies/${studyId}`, {
+            headers: {
+                'Authorization': `Bearer ${demoToken}`,
+                'Content-Type': 'application/json'
+            }
+        });
+
+        if (response.ok) {
+            const study = await response.json();
+            displayStudyDetails(study);
+        } else {
+            throw new Error(`Ошибка загрузки: ${response.status}`);
+        }
+    } catch (error) {
+        showError(`Не удалось загрузить данные исследования: ${error.message}`);
+    }
+}
+
+// Отображение данных исследования
+function displayStudyDetails(study) {
+    document.getElementById('studyTitle').textContent = `Исследование #${study.id}: ${study.filename}`;
+    document.getElementById('loadingMessage').style.display = 'none';
+    document.getElementById('studyContent').style.display = 'block';
+
+    // Заполняем таблицу
+    const table = document.getElementById('studyTable');
+    const probability = study.probability_of_pathology ? (study.probability_of_pathology * 100).toFixed(1) + '%' : 'N/A';
+
+    const rows = [
+        ['Статус:', study.processing_status],
+        ['Вероятность патологии:', `<span style="font-size: 24px; font-weight: bold; color: ${study.pathology === 1 ? 'red' : 'green'};">${probability}</span>`],
+        ['Заключение:', `<span style="font-size: 20px; color: ${study.pathology === 1 ? 'red' : 'green'};">${study.pathology === 1 ? 'ПАТОЛОГИЯ ОБНАРУЖЕНА' : 'НОРМА'}</span>`],
+        ['Тип патологии:', study.most_dangerous_pathology_type || 'Не указан'],
+        ['Время обработки:', `${study.time_of_processing ? study.time_of_processing.toFixed(2) : 'N/A'} сек`]
+    ];
+
+    table.innerHTML = rows.map(row => `
+        <tr>
+            <td style="padding: 8px; border-bottom: 1px solid #dee2e6;"><strong>${row[0]}</strong></td>
+            <td style="padding: 8px; border-bottom: 1px solid #dee2e6;">${row[1]}</td>
+        </tr>
+    `).join('');
+
+    // Загружаем heatmap если доступна
+    if (study.heatmap_path || study.heatmap_visualization_url) {
+        loadHeatmap(study.id);
+    } else {
+        document.getElementById('heatmapLoading').textContent = 'Heatmap не доступна';
+    }
+
+    // Показываем локализацию если есть
+    if (study.pathology_localization_coords) {
+        showLocalization(study.pathology_localization_coords);
+    }
+
+    // Добавляем обработчики для кнопок
+    addActionHandlers();
+}
+
+// Добавление обработчиков для кнопок действий
+function addActionHandlers() {
+    const excelBtn = document.getElementById('excelBtn');
+    const heatmapBtn = document.getElementById('heatmapBtn');
+    const statusDiv = document.getElementById('actionStatus');
+
+    // Обработчик для Excel
+    excelBtn.addEventListener('click', async function() {
+        await downloadExcel(studyId, excelBtn, statusDiv);
+    });
+
+    // Обработчик для Heatmap
+    heatmapBtn.addEventListener('click', async function() {
+        await viewHeatmap(studyId, heatmapBtn, statusDiv);
+    });
+}
+
+// Функция для скачивания Excel
+async function downloadExcel(studyId, btn, statusDiv) {
+    try {
+        statusDiv.style.display = 'block';
+        statusDiv.innerHTML = '<div style="background: #fff3cd; color: #856404; padding: 10px; border-radius: 5px;">⏳ Подготовка Excel отчета...</div>';
+        btn.disabled = true;
+        btn.innerHTML = '⏳ Подготовка...';
+
+        const response = await fetch(`/studies/${studyId}/export`, {
+            headers: {
+                'Authorization': `Bearer ${demoToken}`,
+            }
+        });
+
+        if (response.ok) {
+            const blob = await response.blob();
+
+            // Создаем ссылку для скачивания
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `study_${studyId}_report.xlsx`;
+            document.body.appendChild(a);
+            a.click();
+
+            // Очистка
+            window.URL.revokeObjectURL(url);
+            document.body.removeChild(a);
+
+            statusDiv.innerHTML = '<div style="background: #d4edda; color: #155724; padding: 10px; border-radius: 5px;">✅ Отчет успешно скачан</div>';
+
+        } else {
+            const errorText = await response.text();
+            let errorMessage = 'Неизвестная ошибка';
+            try {
+                const errorJson = JSON.parse(errorText);
+                errorMessage = errorJson.detail || errorText;
+            } catch {
+                errorMessage = errorText;
+            }
+
+            statusDiv.innerHTML = `<div style="background: #f8d7da; color: #721c24; padding: 10px; border-radius: 5px;">❌ Ошибка: ${errorMessage}</div>`;
+        }
+    } catch (error) {
+        statusDiv.innerHTML = `<div style="background: #f8d7da; color: #721c24; padding: 10px; border-radius: 5px;">❌ Ошибка сети: ${error.message}</div>`;
+    } finally {
+        btn.disabled = false;
+        btn.innerHTML = '📊 Скачать Excel отчет';
+
+        // Автоматически скрываем статус через 5 секунд
+        setTimeout(() => {
+            statusDiv.style.display = 'none';
+        }, 5000);
+    }
+}
+
+// Функция для просмотра Heatmap
+async function viewHeatmap(studyId, btn, statusDiv) {
+    try {
+        statusDiv.style.display = 'block';
+        statusDiv.innerHTML = '<div style="background: #fff3cd; color: #856404; padding: 10px; border-radius: 5px;">⏳ Загрузка heatmap...</div>';
+        btn.disabled = true;
+        btn.innerHTML = '⏳ Загрузка...';
+
+        // Создаем новое окно для heatmap
+        const newWindow = window.open('', '_blank');
+
+        // Показываем сообщение о загрузке
+        newWindow.document.write(`
+            <html>
+                <head><title>Heatmap исследования #${studyId}</title></head>
+                <body style="display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; background: #f5f5f5;">
+                    <div style="text-align: center;">
+                        <h2>Загрузка heatmap...</h2>
+                        <p>Пожалуйста, подождите</p>
+                    </div>
+                </body>
+            </html>
+        `);
+
+        // Загружаем heatmap с авторизацией
+        const response = await fetch(`/studies/${studyId}/heatmap`, {
+            headers: {
+                'Authorization': `Bearer ${demoToken}`,
+            }
+        });
+
+        if (response.ok) {
+            const blob = await response.blob();
+            const imageUrl = URL.createObjectURL(blob);
+
+            // Показываем изображение в новой вкладке
+            newWindow.document.write(`
+                <html>
+                    <head>
+                        <title>Heatmap исследования #${studyId}</title>
+                        <style>
+                            body {
+                                margin: 0;
+                                padding: 20px;
+                                background: #f5f5f5;
+                                display: flex;
+                                flex-direction: column;
+                                align-items: center;
+                                font-family: Arial, sans-serif;
+                            }
+                            .container {
+                                max-width: 90%;
+                                text-align: center;
+                            }
+                            img {
+                                max-width: 100%;
+                                max-height: 80vh;
+                                border: 2px solid #ddd;
+                                border-radius: 8px;
+                                box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+                            }
+                            .header {
+                                margin-bottom: 20px;
+                                background: white;
+                                padding: 20px;
+                                border-radius: 8px;
+                                box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+                            }
+                        </style>
+                    </head>
+                    <body>
+                        <div class="container">
+                            <div class="header">
+                                <h2>Heatmap исследования #${studyId}</h2>
+                                <p>Визуализация областей, которые модель считает аномальными</p>
+                            </div>
+                            <img src="${imageUrl}" alt="Heatmap визуализация"
+                                 onload="URL.revokeObjectURL(this.src)">
+                        </div>
+                    </body>
+                </html>
+            `);
+
+            statusDiv.innerHTML = '<div style="background: #d4edda; color: #155724; padding: 10px; border-radius: 5px;">✅ Heatmap загружена в новой вкладке</div>';
+
+        } else {
+            const errorText = await response.text();
+            newWindow.document.write(`
+                <html>
+                    <body style="display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; background: #f5f5f5;">
+                        <div style="text-align: center; background: white; padding: 30px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+                            <h2 style="color: #721c24;">Ошибка загрузки heatmap</h2>
+                            <p>${errorText}</p>
+                            <button onclick="window.close()" style="margin-top: 15px; padding: 8px 16px; background: #dc3545; color: white; border: none; border-radius: 4px; cursor: pointer;">
+                                Закрыть
+                            </button>
+                        </div>
+                    </body>
+                </html>
+            `);
+
+            statusDiv.innerHTML = `<div style="background: #f8d7da; color: #721c24; padding: 10px; border-radius: 5px;">❌ Ошибка загрузки heatmap</div>`;
+        }
+
+    } catch (error) {
+        statusDiv.innerHTML = `<div style="background: #f8d7da; color: #721c24; padding: 10px; border-radius: 5px;">❌ Ошибка сети: ${error.message}</div>`;
+    } finally {
+        btn.disabled = false;
+        btn.innerHTML = '🖼️ Показать Heatmap';
+
+        // Автоматически скрываем статус через 5 секунд
+        setTimeout(() => {
+            statusDiv.style.display = 'none';
+        }, 5000);
+    }
+}
+
+// Загрузка heatmap на страницу (для предпросмотра)
+function loadHeatmap(studyId) {
+    const heatmapImage = document.getElementById('heatmapImage');
+    const heatmapLoading = document.getElementById('heatmapLoading');
+
+    heatmapImage.onload = function() {
+        heatmapLoading.style.display = 'none';
+        heatmapImage.style.display = 'block';
+    };
+
+    heatmapImage.onerror = function() {
+        heatmapLoading.textContent = 'Ошибка загрузки heatmap';
+        heatmapLoading.style.color = '#721c24';
+    };
+
+    // Загружаем heatmap с авторизацией для предпросмотра
+    fetch(`/studies/${studyId}/heatmap`, {
+        headers: {
+            'Authorization': `Bearer ${demoToken}`,
+        }
+    })
+    .then(response => {
+        if (response.ok) {
+            return response.blob();
+        }
+        throw new Error('Heatmap не доступна');
+    })
+    .then(blob => {
+        const imageUrl = URL.createObjectURL(blob);
+        heatmapImage.src = imageUrl;
+    })
+    .catch(error => {
+        heatmapLoading.textContent = 'Heatmap не доступна';
+        heatmapLoading.style.color = '#856404';
+    });
+}
+
+// Показ локализации
+function showLocalization(coords) {
+    const section = document.getElementById('localizationSection');
+    section.style.display = 'block';
+    section.innerHTML = `
+        <div class="localization" style="background: #fff3cd; padding: 15px; border-radius: 8px; margin: 20px 0;">
+            <h3>📍 Локализация патологии</h3>
+            <pre style="background: white; padding: 10px; border-radius: 5px; overflow: auto;">
+${JSON.stringify(coords, null, 2)}
+            </pre>
+        </div>
+    `;
+}
+
+// Показ ошибок
+function showError(message) {
+    document.getElementById('loadingMessage').style.display = 'none';
+    const errorDiv = document.getElementById('errorMessage');
+    errorDiv.style.display = 'block';
+    errorDiv.innerHTML = `
+        <div style="background: #f8d7da; color: #721c24; padding: 15px; border-radius: 5px;">
+            <strong>Ошибка:</strong> ${message}
+            <br><button onclick="loadStudyDetails()" style="margin-top: 10px; padding: 5px 10px; background: #dc3545; color: white; border: none; border-radius: 3px;">
+                Повторить
+            </button>
+        </div>
+    `;
+}
+
+// Получаем токен если нужно
+async function getToken() {
+    if (demoToken && demoToken !== 'None') {
+        return demoToken;
+    }
+
+    try {
+        const response = await fetch('/demo/token');
+        if (response.ok) {
+            const data = await response.json();
+            return data.access_token;
+        }
+    } catch (error) {
+        console.error('Ошибка получения токена:', error);
+    }
+    return null;
+}
+
+// Инициализация
+document.addEventListener('DOMContentLoaded', async function() {
+    const token = await getToken();
+    if (token) {
+        window.demoToken = token;
+        loadStudyDetails();
+    } else {
+        showError('Не удалось получить токен авторизации');
+    }
+});
+</script>
+
+<style>
+.btn {
+    transition: all 0.3s ease;
+}
+
+.btn:hover:not(:disabled) {
+    transform: translateY(-2px);
+    box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+}
+
+.btn:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+    transform: none;
+}
+
+.study-info .card {
+    transition: all 0.3s ease;
+}
+
+.study-info .card:hover {
+    box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+}
+</style>
+{% endblock %}
