@@ -12,28 +12,64 @@
     <div class="upload-section" style="background: #f8f9fa; padding: 20px; border-radius: 8px; margin: 20px 0;">
         <h2>📤 Загрузить исследование</h2>
 
-        <!-- ФОРМА С JavaScript ДЛЯ АВТОРИЗАЦИИ -->
-        <form id="uploadForm" enctype="multipart/form-data">
-            <div style="margin: 15px 0;">
-                <label for="file" style="display: block; margin-bottom: 8px; font-weight: bold;">
-                    Выберите ZIP архив с DICOM файлами:
-                </label>
-                <input type="file" id="file" name="file" accept=".zip" required
-                       style="padding: 10px; border: 2px dashed #ccc; border-radius: 5px; width: 100%;">
-            </div>
-            <button type="submit"
-                    style="background: #007bff; color: white; padding: 12px 24px; border: none; border-radius: 5px; cursor: pointer;">
-                📤 Загрузить и проанализировать
-            </button>
-        </form>
+        <!-- Одиночная загрузка -->
+        <div style="margin-bottom: 30px; padding-bottom: 20px; border-bottom: 1px solid #ddd;">
+            <h3>📄 Одиночная загрузка</h3>
+            <form id="uploadForm" enctype="multipart/form-data">
+                <div style="margin: 15px 0;">
+                    <label for="file" style="display: block; margin-bottom: 8px; font-weight: bold;">
+                        Выберите ZIP архив с DICOM файлами:
+                    </label>
+                    <input type="file" id="file" name="file" accept=".zip" required
+                           style="padding: 10px; border: 2px dashed #ccc; border-radius: 5px; width: 100%;">
+                </div>
+                <button type="submit"
+                        style="background: #007bff; color: white; padding: 12px 24px; border: none; border-radius: 5px; cursor: pointer;">
+                    📤 Загрузить и проанализировать
+                </button>
+            </form>
+            <div id="uploadStatus" style="margin-top: 15px; display: none;"></div>
+        </div>
 
-        <div id="uploadStatus" style="margin-top: 15px; display: none;"></div>
+        <!-- Массовая загрузка -->
+        <div style="margin-bottom: 20px;">
+            <h3>📦 Массовая загрузка</h3>
+            <form id="bulkUploadForm" enctype="multipart/form-data">
+                <div style="margin: 15px 0;">
+                    <label for="files" style="display: block; margin-bottom: 8px; font-weight: bold;">
+                        Выберите несколько ZIP архивов (максимум 20):
+                    </label>
+                    <input type="file" id="files" name="files" accept=".zip" multiple required
+                           style="padding: 10px; border: 2px dashed #ccc; border-radius: 5px; width: 100%;">
+                    <div style="font-size: 14px; color: #666; margin-top: 5px;">
+                        ⚠️ Удерживайте Ctrl для выбора нескольких файлов
+                    </div>
+                </div>
+                <button type="submit"
+                        style="background: #28a745; color: white; padding: 12px 24px; border: none; border-radius: 5px; cursor: pointer;">
+                    🚀 Массовая загрузка
+                </button>
+            </form>
+            <div id="bulkUploadStatus" style="margin-top: 15px; display: none;"></div>
+            <div id="bulkProgress" style="margin-top: 15px; display: none;">
+                <div style="background: #e9ecef; border-radius: 5px; padding: 10px;">
+                    <div style="display: flex; justify-content: space-between; margin-bottom: 5px;">
+                        <span>Прогресс:</span>
+                        <span id="progressText">0/0</span>
+                    </div>
+                    <div style="background: #dee2e6; border-radius: 3px; height: 10px;">
+                        <div id="progressBar" style="background: #28a745; height: 100%; width: 0%; border-radius: 3px; transition: width 0.3s;"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
 
         <div style="margin-top: 15px; padding: 15px; background: #fff3cd; border-radius: 5px;">
             <p><strong>Как это работает:</strong></p>
             <ol style="margin: 10px 0; padding-left: 20px;">
-                <li>Загрузите ZIP файл через форму выше</li>
-                <li>Система автоматически обработает его через существующие эндпоинты</li>
+                <li><strong>Одиночная загрузка</strong> - для одного исследования</li>
+                <li><strong>Массовая загрузка</strong> - для нескольких исследований одновременно (до 20 файлов)</li>
+                <li>Система автоматически обработает файлы через существующие эндпоинты</li>
                 <li>Перейдите на <a href="/demo/results">страницу результатов</a> чтобы отслеживать прогресс</li>
                 <li>Просматривайте детали, heatmap и скачивайте отчеты</li>
             </ol>
@@ -51,7 +87,7 @@
 </div>
 
 <script>
-// Глобальная переменная для хранения токена
+// Токен для API запросов
 let demoToken = '{{ demo_token }}';
 
 // Функция для получения токена, если он не передан в шаблоне
@@ -73,7 +109,7 @@ async function getDemoToken() {
     return null;
 }
 
-// Обработчик отправки формы
+// ========== ОДИНОЧНАЯ ЗАГРУЗКА ==========
 document.getElementById('uploadForm').addEventListener('submit', async function(e) {
     e.preventDefault();
 
@@ -145,5 +181,175 @@ document.getElementById('uploadForm').addEventListener('submit', async function(
         submitButton.textContent = '📤 Загрузить и проанализировать';
     }
 });
+
+// ========== МАССОВАЯ ЗАГРУЗКА ==========
+document.getElementById('bulkUploadForm').addEventListener('submit', async function(e) {
+    e.preventDefault();
+
+    const filesInput = document.getElementById('files');
+    const statusDiv = document.getElementById('bulkUploadStatus');
+    const progressDiv = document.getElementById('bulkProgress');
+    const progressBar = document.getElementById('progressBar');
+    const progressText = document.getElementById('progressText');
+    const submitButton = this.querySelector('button[type="submit"]');
+
+    if (!filesInput.files.length) {
+        alert('Пожалуйста, выберите файлы');
+        return;
+    }
+
+    if (filesInput.files.length > 20) {
+        alert('Максимум 20 файлов за раз. Пожалуйста, выберите меньше файлов.');
+        return;
+    }
+
+    // Получаем токен
+    const token = await getDemoToken();
+    if (!token) {
+        statusDiv.style.display = 'block';
+        statusDiv.innerHTML = '<div style="background: #f8d7da; color: #721c24; padding: 10px; border-radius: 5px;">❌ Ошибка: Не удалось получить токен авторизации</div>';
+        return;
+    }
+
+    const formData = new FormData();
+    for (let i = 0; i < filesInput.files.length; i++) {
+        formData.append('files', filesInput.files[i]);
+    }
+
+    // Показываем статус загрузки
+    statusDiv.style.display = 'block';
+    statusDiv.innerHTML = `<div style="background: #d4edda; color: #155724; padding: 10px; border-radius: 5px;">
+        ⏳ Начинаю массовую загрузку ${filesInput.files.length} файлов...
+    </div>`;
+
+    progressDiv.style.display = 'block';
+    progressBar.style.width = '0%';
+    progressText.textContent = `0/${filesInput.files.length}`;
+
+    submitButton.disabled = true;
+    submitButton.textContent = '🚀 Загрузка...';
+
+    try {
+        // Отправляем запрос с авторизацией
+        const response = await fetch('/studies/upload/bulk', {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${token}`
+            },
+            body: formData
+        });
+
+        if (response.ok) {
+            const results = await response.json();
+
+            // Обновляем прогресс
+            progressBar.style.width = '100%';
+            progressText.textContent = `${filesInput.files.length}/${filesInput.files.length}`;
+
+            const successCount = results.length;
+            const failedCount = filesInput.files.length - successCount;
+
+            let successMessage = `✅ Успешно загружено: ${successCount} файлов`;
+            if (successCount > 0) {
+                successMessage += `<br>ID исследований: ${results.map(r => r.id).join(', ')}`;
+            }
+
+            if (failedCount > 0) {
+                successMessage += `<br>❌ Не удалось загрузить: ${failedCount} файлов`;
+            }
+
+            statusDiv.innerHTML = `<div style="background: #d4edda; color: #155724; padding: 10px; border-radius: 5px;">
+                ${successMessage}
+                <br><a href="/demo/results" style="color: #155724; text-decoration: underline;">Перейти к результатам</a>
+            </div>`;
+
+            // Очищаем форму
+            filesInput.value = '';
+
+        } else {
+            const errorText = await response.text();
+            let errorMessage = 'Неизвестная ошибка';
+            try {
+                const errorJson = JSON.parse(errorText);
+                errorMessage = errorJson.detail || errorText;
+            } catch {
+                errorMessage = errorText;
+            }
+
+            statusDiv.innerHTML = `<div style="background: #f8d7da; color: #721c24; padding: 10px; border-radius: 5px;">
+                ❌ Ошибка массовой загрузки: ${errorMessage}
+            </div>`;
+        }
+    } catch (error) {
+        statusDiv.innerHTML = `<div style="background: #f8d7da; color: #721c24; padding: 10px; border-radius: 5px;">
+            ❌ Ошибка сети: ${error.message}
+        </div>`;
+    } finally {
+        submitButton.disabled = false;
+        submitButton.textContent = '🚀 Массовая загрузка';
+
+        // Через 10 секунд скрываем прогресс
+        setTimeout(() => {
+            progressDiv.style.display = 'none';
+        }, 10000);
+    }
+});
+
+// Ограничение выбора файлов для массовой загрузки
+document.getElementById('files').addEventListener('change', function(e) {
+    const files = e.target.files;
+    if (files.length > 20) {
+        alert('Максимум 20 файлов за раз. Будут загружены только первые 20 файлов.');
+        // Оставляем только первые 20 файлов
+        const fileList = new DataTransfer();
+        for (let i = 0; i < Math.min(files.length, 20); i++) {
+            fileList.items.add(files[i]);
+        }
+        e.target.files = fileList.files;
+    }
+
+    // Показываем количество выбранных файлов
+    const statusDiv = document.getElementById('bulkUploadStatus');
+    if (files.length > 0) {
+        statusDiv.style.display = 'block';
+        statusDiv.innerHTML = `<div style="background: #e2f0ff; color: #004085; padding: 10px; border-radius: 5px;">
+            📁 Выбрано файлов: ${files.length}${files.length > 20 ? ' (будут загружены первые 20)' : ''}
+        </div>`;
+    }
+});
 </script>
+
+<style>
+.btn {
+    transition: all 0.3s ease;
+}
+
+.btn:hover:not(:disabled) {
+    transform: translateY(-2px);
+    box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+}
+
+.btn:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+    transform: none;
+}
+
+.upload-section {
+    transition: all 0.3s ease;
+}
+
+.upload-section:hover {
+    box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+}
+
+input[type="file"] {
+    transition: all 0.3s ease;
+}
+
+input[type="file"]:hover {
+    border-color: #007bff;
+    background-color: #f8f9fa;
+}
+</style>
 {% endblock %}

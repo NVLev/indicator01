@@ -218,9 +218,12 @@ def _run_ml_inference_fast(organized_path: str, study_id: int) -> Dict:
         else:
             logger.warning("⚠️ heatmap_data отсутствует в результатах ML")
 
-        # Верификация результатов
-        if ml_results.get("pathology") == 1:
+        pathology_value = ml_results.get("pathology", 0)
+        if pathology_value == 1:
             pathology_type = "подозрение на патологию"
+        else:
+            pathology_type = ""
+
         base_result = {
             "inference_completed": True,
             "probability_of_pathology": ml_results.get("probability_of_pathology", 0.0),
@@ -294,6 +297,7 @@ def _run_ml_inference_fast(organized_path: str, study_id: int) -> Dict:
         return {
             "probability_of_pathology": 0.0,
             "pathology": 0,
+            "most_dangerous_pathology_type": "",  # ✅ Always return empty string on error
             "processing_status": "failed",
             "error_message": str(e),
             "heatmap_data": {}
