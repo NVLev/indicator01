@@ -7,6 +7,7 @@ from fastapi.responses import FileResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import func, select
 import logging
+from fastapi import BackgroundTasks
 from ..core.db_helper import db_helper
 from ..core.models import User, Study, StudyStatus
 from ..core.schemas import StudyResponse, StudyListResponse, ExcelReportRequest
@@ -220,7 +221,7 @@ async def get_task_progress(
             "study_id": study.id,
             "status": status_enum.value,
             "progress": progress_map.get(study.processing_status, 0),
-            "message": f"Статус: {sstatus_enum.value}",
+            "message": f"Статус: {status_enum.value}",
             "estimated_time": "До 10 минут"
         }
 
@@ -392,6 +393,100 @@ async def export_study_excel(
     finally:
         # Файл будет удален после отправки благодаря delete=False
         pass
+
+
+@router.post("/upload/bulk", response_model=List[StudyResponse], summary="Массовая загрузка исследований")
+async def upload_studies_bulk(
+        files: List[UploadFile] = File(..., description="Список ZIP-архивов с DICOM файлами"),
+        current_user: User = Depends(get_current_user),
+        session: AsyncSession = Depends(db_helper.session_getter)
+):
+    """
+    Массовая загрузка нескольких ZIP-архивов одновременно
+
+    - Максимум 20 файлов за раз
+    - Каждый файл до 500MB
+    - Формат: ZIP архивы с DICOM файлами
+    - Обработка каждого занимает до 10 минут
+    """
+
+    if len(files) > 20:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Максимум 20 файлов за раз. Текущее количество: {len(files)}"
+        )
+
+    # Валидация расширений
+    for file in files:
+        if not file.filename or not file.filename.lower().endswith(".zip"):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Файл {file.filename} не является ZIP-архивом"
+            )
+
+    upload_dir = Path("/app/backend/uploads") / str(current_user.id)
+    upload_dir.mkdir(parents=True, exist_ok=True)
+
+    uploaded_studies: list[StudyResponse] = []
+    failed_uploads: list[dict] = []
+
+    for file in files:
+        file_path = upload_dir / file.filename
+        try:
+            # Потоковая запись вместо чтения в память
+            with open(file_path, "wb") as buffer:
+                while chunk := await file.read(1024 * 1024):  # читаем по 1Мб
+                    buffer.write(chunk)
+            await file.close()
+
+            if not file_path.exists() or file_path.stat().st_size == 0:
+                raise ValueError("Не удалось сохранить файл на сервер")
+
+            # Создаём запись в БД
+            study = await StudyService.create_study(
+                user_id=current_user.id,
+                filename=file.filename,
+                file_path=str(file_path),
+                session=session
+            )
+
+            # Запускаем задачу в Celery
+            task_result = process_complete_study_task.delay(
+                zip_file_path=str(file_path),
+                study_id=study.id
+            )
+
+            study.task_id = task_result.id
+            await session.commit()
+            await session.refresh(study)
+
+            # Формируем DTO
+            study_response = StudyResponse.model_validate(study)
+            study_dict = study_response.model_dump()
+            study_dict["heatmap_visualization_url"] = f"/studies/{study.id}/heatmap"
+
+            uploaded_studies.append(StudyResponse(**study_dict))
+            logger.info(f"Файл {file.filename} успешно загружен (study_id={study.id})")
+
+        except Exception as e:
+            if file_path.exists():
+                try:
+                    file_path.unlink()
+                except Exception as cleanup_err:
+                    logger.warning(f"Не удалось удалить файл {file_path}: {cleanup_err}")
+            failed_uploads.append({"filename": file.filename, "error": str(e)})
+            logger.error(f"Ошибка загрузки {file.filename}: {e}")
+
+    if not uploaded_studies and failed_uploads:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail={"message": "Не удалось загрузить ни одного файла", "failed_files": failed_uploads}
+        )
+
+    if failed_uploads:
+        logger.warning(f"Загружено {len(uploaded_studies)} из {len(files)} файлов. Ошибки: {failed_uploads}")
+
+    return uploaded_studies
 
 
 @router.get(
