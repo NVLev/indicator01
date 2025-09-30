@@ -84,41 +84,103 @@ async function loadStudyDetails() {
     }
 }
 
-// Отображение данных исследования
-function displayStudyDetails(study) {
-    document.getElementById('studyTitle').textContent = `Исследование #${study.id}: ${study.filename}`;
-    document.getElementById('loadingMessage').style.display = 'none';
-    document.getElementById('studyContent').style.display = 'block';
+    // Отображение данных исследования
+    function displayStudyDetails(study) {
+        document.getElementById('studyTitle').textContent = `Исследование #${study.id}: ${study.filename}`;
+        document.getElementById('loadingMessage').style.display = 'none';
+        document.getElementById('studyContent').style.display = 'block';
 
-    // Заполняем таблицу
-    const table = document.getElementById('studyTable');
-    const probability = study.probability_of_pathology ? (study.probability_of_pathology * 100).toFixed(1) + '%' : 'N/A';
+        // Заполняем таблицу
+        const table = document.getElementById('studyTable');
+        const probability = study.probability_of_pathology ? (study.probability_of_pathology * 100).toFixed(1) + '%' : 'N/A';
 
-    const rows = [
-        ['Статус:', study.processing_status],
-        ['Вероятность патологии:', `<span style="font-size: 24px; font-weight: bold; color: ${study.pathology === 1 ? 'red' : 'green'};">${probability}</span>`],
-        ['Заключение:', `<span style="font-size: 20px; color: ${study.pathology === 1 ? 'red' : 'green'};">${study.pathology === 1 ? 'ПАТОЛОГИЯ ОБНАРУЖЕНА' : 'НОРМА'}</span>`],
-        ['Тип патологии:', study.most_dangerous_pathology_type || 'Не указан'],
-        ['Время обработки:', `${study.time_of_processing ? study.time_of_processing.toFixed(2) : 'N/A'} сек`]
-    ];
+        const rows = [
+            ['Статус:', study.processing_status],
+            ['Вероятность патологии:', `<span style="font-size: 24px; font-weight: bold; color: ${study.pathology === 1 ? 'red' : 'green'};">${probability}</span>`],
+            ['Заключение:', `<span style="font-size: 20px; color: ${study.pathology === 1 ? 'red' : 'green'};">${study.pathology === 1 ? 'ПАТОЛОГИЯ ОБНАРУЖЕНА' : 'НОРМА'}</span>`],
+            ['Тип патологии:', study.most_dangerous_pathology_type || 'Не указан'],
+            ['Время обработки:', `${study.time_of_processing ? study.time_of_processing.toFixed(2) : 'N/A'} сек`]
+        ];
 
-    table.innerHTML = rows.map(row => `
-        <tr>
-            <td style="padding: 8px; border-bottom: 1px solid #dee2e6;"><strong>${row[0]}</strong></td>
-            <td style="padding: 8px; border-bottom: 1px solid #dee2e6;">${row[1]}</td>
-        </tr>
-    `).join('');
+        table.innerHTML = rows.map(row => `
+            <tr>
+                <td style="padding: 8px; border-bottom: 1px solid #dee2e6;"><strong>${row[0]}</strong></td>
+                <td style="padding: 8px; border-bottom: 1px solid #dee2e6;">${row[1]}</td>
+            </tr>
+        `).join('');
 
-    // Загружаем heatmap если доступна
-    if (study.heatmap_path || study.heatmap_visualization_url) {
-        loadHeatmap(study.id);
-    } else {
-        document.getElementById('heatmapLoading').textContent = 'Heatmap не доступна';
-    }
+        // Показываем блок ошибки если есть error_message
+        if (study.error_message && study.error_message.trim() !== '') {
+            showErrorSection(study);
+        }
 
-    // Показываем локализацию если есть
-    if (study.pathology_localization_coords) {
-        showLocalization(study.pathology_localization_coords);
+        // Загружаем heatmap если доступна
+        if (study.heatmap_path || study.heatmap_visualization_url) {
+            loadHeatmap(study.id);
+        } else {
+            document.getElementById('heatmapLoading').textContent = 'Heatmap не доступна';
+        }
+
+        // Показываем локализацию если есть
+        if (study.pathology_localization_coords) {
+            showLocalization(study.pathology_localization_coords);
+        }
+
+
+    // Функция для показа блока ошибки
+    function showErrorSection(study) {
+        const errorSection = document.getElementById('errorSection');
+        errorSection.style.display = 'block';
+
+        let errorHtml = `
+            <div class="error-section" style="background: #f8d7da; border: 1px solid #f5c6cb; border-radius: 8px; padding: 20px; margin: 20px 0;">
+                <h3 style="color: #721c24; margin-top: 0;">❌ Ошибка обработки исследования</h3>
+                <div class="error-message" style="color: #721c24; margin-bottom: 15px;">
+                    <strong>Описание ошибки:</strong> ${study.error_message}
+                </div>
+        `;
+
+        // Добавляем контекстную помощь в зависимости от типа ошибки
+        if (study.error_message.includes('DICOM') || study.error_message.includes('ZIP') || study.error_message.includes('архив') || study.error_message.includes('файлов')) {
+            errorHtml += `
+            <div class="error-help" style="background: #fff3cd; border: 1px solid #ffeaa7; border-radius: 5px; padding: 15px;">
+                <strong style="color: #856404;">💡 Рекомендации по исправлению:</strong>
+                <ul style="margin: 10px 0; color: #856404;">
+                    <li>Убедитесь, что архив содержит файлы в формате DICOM (.dcm)</li>
+                    <li>Проверьте, что архив не поврежден и правильно создан</li>
+                    <li>Используйте архив, полученный напрямую от медицинского оборудования</li>
+                    <li>Убедитесь, что размер архива не превышает 500MB</li>
+                    <li>Попробуйте распаковать архив и проверить файлы вручную</li>
+                </ul>
+            </div>
+            `;
+        } else if (study.error_message.includes('обработк') || study.error_message.includes('обработать') || study.error_message.includes('процесс') || study.error_message.includes('памят')) {
+            errorHtml += `
+            <div class="error-help" style="background: #fff3cd; border: 1px solid #ffeaa7; border-radius: 5px; padding: 15px;">
+                <strong style="color: #856404;">💡 Рекомендации по исправлению:</strong>
+                <ul style="margin: 10px 0; color: #856404;">
+                    <li>Попробуйте загрузить файл еще раз</li>
+                    <li>Проверьте, что все DICOM файлы в архиве корректны</li>
+                    <li>Убедитесь, что файлы не повреждены</li>
+                    <li>Если ошибка повторяется, обратитесь в техническую поддержку</li>
+                </ul>
+            </div>
+            `;
+        } else {
+            errorHtml += `
+            <div class="error-help" style="background: #fff3cd; border: 1px solid #ffeaa7; border-radius: 5px; padding: 15px;">
+                <strong style="color: #856404;">💡 Что можно сделать:</strong>
+                <ul style="margin: 10px 0; color: #856404;">
+                    <li>Попробуйте загрузить файл еще раз</li>
+                    <li>Проверьте корректность исходных данных</li>
+                    <li>Обратитесь в техническую поддержку с описанием ошибки</li>
+                </ul>
+            </div>
+            `;
+        }
+
+        errorHtml += `</div>`;
+        errorSection.innerHTML = errorHtml;
     }
 
     // Добавляем обработчики для кнопок

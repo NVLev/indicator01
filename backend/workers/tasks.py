@@ -101,7 +101,21 @@ def process_complete_study_task(self, zip_file_path: str, study_id: int, output_
 
         dicom_time = _check_time_and_update_progress(50, "Обработка DICOM завершена")
         logger.info(f"DICOM обработка завершена за {dicom_time:.1f} сек")
+        logger.info(f"📊 Результаты DICOM обработки исследования {study_id}:")
+        study_metadata = processing_result.get("study_metadata", {})
+        study_structure = study_metadata.get("study_structure", {})
 
+        logger.info(f"   Study UID: {study_metadata.get('PrimaryStudyInstanceUID', 'N/A')}")
+        logger.info(f"   Series UID: {study_metadata.get('PrimarySeriesInstanceUID', 'N/A')}")
+        logger.info(
+            f"   Структура исследования: {study_structure.get('total_studies', 1)} studies, {study_structure.get('total_series', 1)} series")
+        logger.info(f"   Файлов обработано: {processing_result.get('total_instances', 0)}")
+        logger.info(f"   Серий обнаружено: {processing_result.get('series_count', 0)}")
+
+        # Логируем все Study UID если их несколько
+        if study_structure.get('is_multi_study', False):
+            study_uids = study_structure.get('study_uids', [])
+            logger.info(f"   Обнаружено несколько Study UID: {study_uids}")
         # === ЭТАП 2: ML АНАЛИЗ ===
         update_study_status_sync(study_id, "processing_ml")
         _check_time_and_update_progress(60, "Запуск ИИ анализа")

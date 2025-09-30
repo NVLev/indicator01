@@ -152,7 +152,11 @@ def _process_dicom_study_sync(
             output_dir,
             study_metadata.get("StudyInstanceUID", f"study_{study_id}")
         )
-
+        logger.info(f"📊 Результаты парсинга:")
+        logger.info(f"  Валидных файлов: {len(valid_files)}")
+        logger.info(f"  Study UID: {study_metadata.get('StudyInstanceUID', 'N/A')}")
+        logger.info(f"  Series UID: {study_metadata.get('SeriesInstanceUID', 'N/A')}")
+        logger.info(f"  Структура: {study_metadata.get('study_structure', {})}")
         processing_result.update({
             "dicom_files": [str(p) for p in valid_files],
             "study_metadata": study_metadata,
@@ -229,6 +233,25 @@ async def update_study_results(
             return
 
         metadata = results.get("study_metadata", {})
+        study_structure = metadata.get("study_structure", {})
+
+        # Используем ПРАВИЛЬНЫЕ UID из анализа структуры
+        primary_study_uid = metadata.get("PrimaryStudyInstanceUID", "")
+        primary_series_uid = metadata.get("PrimarySeriesInstanceUID", "")
+
+        study.study_uid = primary_study_uid
+        study.series_uid = primary_series_uid
+
+        # Сохраняем полную информацию о структуре
+        study.metadata_json = {
+            "study_structure": study_structure,
+            "primary_study_uid": primary_study_uid,
+            "primary_series_uid": primary_series_uid,
+            "total_studies": study_structure.get("total_studies", 1),
+            "total_series": study_structure.get("total_series", 1),
+            "is_multi_study": study_structure.get("is_multi_study", False),
+            "is_multi_series": study_structure.get("is_multi_series", False)
+        }
 
         study.probability_of_pathology = results.get("probability_of_pathology", 0.0)
         study.pathology = results.get("pathology", 0)
@@ -263,13 +286,11 @@ async def update_study_results(
         study.total_instances = results.get("total_instances", study.total_instances or 0)
         study.series_count = results.get("series_count", study.series_count or 0)
 
-        # Сохраняем метаданные как JSON (если поле есть)
-        if hasattr(study, "metadata_json"):
-            study.metadata_json = metadata
-
         study.updated_at = func.now()
         await session.commit()
         logger.info(f"Исследование {study_id} обновлено результатами обработки (status={resolved_status})")
+        logger.info(
+            f"  Структура: {study_structure.get('total_studies', 1)} studies, {study_structure.get('total_series', 1)} series")
 
     except Exception as e:
         logger.exception(f"Не удалось обновить результаты исследования {study_id}: {e}")
@@ -277,28 +298,45 @@ async def update_study_results(
 
 
 def parse_dicom_files(file_paths: List[Path]) -> Tuple[Dict, List[Path]]:
-    """Парсинг DICOM файлов и извлечение метаданных"""
+    """Парсинг DICOM файлов и извлечение метаданных с правильной обработкой UID"""
     study_metadata: Dict = {}
     valid_files: List[Path] = []
     series_info: Dict[str, Dict] = {}
 
+    # Собираем все StudyInstanceUID для анализа
+    study_uids = set()
+    series_uids = set()
+
     for file_path in file_paths:
         try:
-            ds = pydicom.dcmread(str(file_path), force=True)
-            if not hasattr(ds, "StudyInstanceUID"):
-                logger.warning(f"Файл {file_path} без StudyInstanceUID — пропускаем")
+            ds = pydicom.dcmread(str(file_path), force=True, stop_before_pixels=True)
+
+            # Проверяем обязательные поля
+            if not hasattr(ds, "StudyInstanceUID") or not hasattr(ds, "SeriesInstanceUID"):
+                logger.warning(f"Файл {file_path} без StudyInstanceUID/SeriesInstanceUID — пропускаем")
                 continue
 
+            study_uid = str(ds.StudyInstanceUID).strip()
+            series_uid = str(ds.SeriesInstanceUID).strip()
+
+            # Собираем уникальные UID
+            study_uids.add(study_uid)
+            series_uids.add(series_uid)
+
+            # Если это первый валидный файл, берем его метаданные как базовые
             if not study_metadata:
                 study_metadata = extract_study_metadata(ds)
+                # Но перезаписываем UID на собранные множества для точности
+                study_metadata["StudyInstanceUIDs"] = list(study_uids)
+                study_metadata["SeriesInstanceUIDs"] = list(series_uids)
 
-            series_uid = getattr(ds, "SeriesInstanceUID", "unknown")
             if series_uid not in series_info:
                 series_info[series_uid] = {
                     "SeriesInstanceUID": series_uid,
                     "SeriesDescription": getattr(ds, "SeriesDescription", ""),
                     "SeriesNumber": getattr(ds, "SeriesNumber", ""),
                     "Modality": getattr(ds, "Modality", ""),
+                    "StudyInstanceUID": study_uid,  # Добавляем Study UID для серии
                     "files": []
                 }
 
@@ -310,49 +348,154 @@ def parse_dicom_files(file_paths: List[Path]) -> Tuple[Dict, List[Path]]:
         except Exception as e:
             logger.warning(f"Ошибка чтения {file_path}: {e}")
 
+    # Анализируем структуру исследования
+    study_metadata["study_structure"] = analyze_study_structure(study_uids, series_uids, series_info)
+
+    # Выбираем основной StudyInstanceUID (самый частый или первый)
+    primary_study_uid = select_primary_study_uid(series_info)
+    study_metadata["PrimaryStudyInstanceUID"] = primary_study_uid
+
+    # Выбираем основную SeriesInstanceUID (самую большую серию)
+    primary_series_uid = select_primary_series_uid(series_info)
+    study_metadata["PrimarySeriesInstanceUID"] = primary_series_uid
+
     study_metadata["series_info"] = series_info
+
+    logger.info(
+        f"📊 Анализ исследования: {len(study_uids)} Study UID, {len(series_uids)} Series UID, {len(valid_files)} файлов")
+
     return study_metadata, valid_files
 
 
+def analyze_study_structure(study_uids: set, series_uids: set, series_info: Dict) -> Dict:
+    """Анализирует структуру исследования"""
+    structure = {
+        "total_studies": len(study_uids),
+        "total_series": len(series_uids),
+        "is_multi_study": len(study_uids) > 1,
+        "is_multi_series": len(series_uids) > 1,
+        "study_uids": list(study_uids),
+        "series_uids": list(series_uids),
+        "series_distribution": {}
+    }
+
+    for series_uid, info in series_info.items():
+        structure["series_distribution"][series_uid] = {
+            "file_count": len(info["files"]),
+            "study_uid": info["StudyInstanceUID"],
+            "description": info["SeriesDescription"],
+            "modality": info["Modality"]
+        }
+
+    return structure
+
+
+def select_primary_study_uid(series_info: Dict) -> str:
+    """Выбирает основной StudyInstanceUID (самый частый)"""
+    study_uid_counts = {}
+    for series_uid, info in series_info.items():
+        study_uid = info["StudyInstanceUID"]
+        study_uid_counts[study_uid] = study_uid_counts.get(study_uid, 0) + len(info["files"])
+
+    if study_uid_counts:
+        return max(study_uid_counts.items(), key=lambda x: x[1])[0]
+    return ""
+
+
+def select_primary_series_uid(series_info: Dict) -> str:
+    """Выбирает основную SeriesInstanceUID (самая большая серия)"""
+    if not series_info:
+        return ""
+
+    # Ищем серию с максимальным количеством файлов
+    primary_series = max(series_info.items(), key=lambda x: len(x[1]["files"]))
+    return primary_series[0]
+
+
 def extract_study_metadata(ds: pydicom.Dataset) -> Dict:
-    """Извлекаем полезные метаданные из первого валидного DICOM-файла"""
+    """Извлекаем полезные метаданные из DICOM-файла с правильными тегами"""
     metadata: Dict = {
         "StudyInstanceUID": getattr(ds, "StudyInstanceUID", ""),
         "SeriesInstanceUID": getattr(ds, "SeriesInstanceUID", ""),
         "PatientID": getattr(ds, "PatientID", ""),
+        "PatientName": getattr(ds, "PatientName", ""),
         "StudyDescription": getattr(ds, "StudyDescription", ""),
         "StudyDate": getattr(ds, "StudyDate", ""),
         "StudyTime": getattr(ds, "StudyTime", ""),
         "Modality": getattr(ds, "Modality", ""),
         "Manufacturer": getattr(ds, "Manufacturer", ""),
         "ManufacturerModelName": getattr(ds, "ManufacturerModelName", ""),
+        # Добавляем дополнительные важные поля
+        "AccessionNumber": getattr(ds, "AccessionNumber", ""),
+        "StudyID": getattr(ds, "StudyID", ""),
+        "SeriesNumber": getattr(ds, "SeriesNumber", ""),
+        "SeriesDescription": getattr(ds, "SeriesDescription", ""),
+        "InstanceNumber": getattr(ds, "InstanceNumber", ""),
     }
 
+    # Извлекаем размеры изображения
     if hasattr(ds, "Rows") and hasattr(ds, "Columns"):
         metadata["ImageDimensions"] = f"{ds.Rows}x{ds.Columns}"
+        metadata["Rows"] = ds.Rows
+        metadata["Columns"] = ds.Columns
 
+    # Извлекаем информацию о пикселях
     if hasattr(ds, "PixelSpacing"):
-        metadata["PixelSpacing"] = list(ds.PixelSpacing)
+        try:
+            metadata["PixelSpacing"] = [float(x) for x in ds.PixelSpacing]
+        except (TypeError, ValueError):
+            metadata["PixelSpacing"] = list(ds.PixelSpacing)
 
     if hasattr(ds, "SliceThickness"):
         try:
             metadata["SliceThickness"] = float(ds.SliceThickness)
-        except Exception:
-            pass
+        except (TypeError, ValueError):
+            metadata["SliceThickness"] = ds.SliceThickness
+
+    # Добавляем информацию о положении пациента
+    if hasattr(ds, "PatientPosition"):
+        metadata["PatientPosition"] = ds.PatientPosition
+
+    # Добавляем информацию о кодировке
+    if hasattr(ds, "SpecificCharacterSet"):
+        metadata["CharacterSet"] = ds.SpecificCharacterSet
 
     return metadata
 
 
 def group_files_by_series(file_paths: List[Path]) -> Dict[str, List[Path]]:
-    """Группируем файлы по SeriesInstanceUID (чтобы собрать серии)"""
+    """Группируем файлы по SeriesInstanceUID с учетом StudyInstanceUID"""
     series_groups: Dict[str, List[Path]] = {}
+    study_series_map: Dict[str, set] = {}  # Study UID -> set of Series UID
+
     for file_path in file_paths:
         try:
             ds = pydicom.dcmread(str(file_path), stop_before_pixels=True)
-            series_uid = getattr(ds, "SeriesInstanceUID", "unknown")
-            series_groups.setdefault(series_uid, []).append(file_path)
+
+            # Проверяем обязательные UID
+            if not hasattr(ds, "SeriesInstanceUID") or not hasattr(ds, "StudyInstanceUID"):
+                continue
+
+            series_uid = str(ds.SeriesInstanceUID).strip()
+            study_uid = str(ds.StudyInstanceUID).strip()
+
+            # Обновляем маппинг Study->Series
+            if study_uid not in study_series_map:
+                study_series_map[study_uid] = set()
+            study_series_map[study_uid].add(series_uid)
+
+            # Группируем файлы по Series UID
+            if series_uid not in series_groups:
+                series_groups[series_uid] = []
+            series_groups[series_uid].append(file_path)
+
         except Exception as e:
             logger.warning(f"Ошибка группировки файла {file_path}: {e}")
+
+    logger.info(f"📁 Группировка: {len(study_series_map)} studies -> {len(series_groups)} series")
+    for study_uid, series_set in study_series_map.items():
+        logger.info(f"  Study {study_uid[:20]}...: {len(series_set)} series")
+
     return series_groups
 
 
@@ -446,29 +589,35 @@ def extract_zip_archive(zip_path: str, extract_to: str) -> List[Path]:
         with zipfile.ZipFile(zip_path, 'r') as zip_ref:
             bad_file = zip_ref.testzip()
             if bad_file:
-                raise DicomProcessingError(f"Повреждённый файл в архиве: {bad_file}")
-
+                raise DicomProcessingError(f"Поврежденный файл в архиве: {bad_file}")
 
         with zipfile.ZipFile(zip_path, "r") as zip_ref:
             file_list = [
                 f for f in zip_ref.namelist()
                 if not f.endswith("/") and not os.path.basename(f).startswith(".")
             ]
-            logger.info(f" Найдено {len(file_list)} файлов в архиве: {file_list[:5]}...")
+
             if not file_list:
-                raise DicomProcessingError("ZIP-архив пуст")
+                raise DicomProcessingError("ZIP-архив пуст или содержит только папки")
+
+            logger.info(f"Найдено {len(file_list)} файлов в архиве")
 
             os.makedirs(extract_to, exist_ok=True)
+
+            checked_files = 0
+            skipped_extensions = set()
             for file_name in file_list:
                 try:
                     extracted_path_str = zip_ref.extract(file_name, extract_to)
                     extracted_path = Path(extracted_path_str)
-                    logger.debug(f"Checking if {extracted_path.name} is DICOM...")
+                    checked_files += 1
+                    logger.debug(f"Проверяю, является ли {extracted_path.name}  файлом DICOM...")
                     if is_likely_dicom_file(extracted_path):
                         extracted_files.append(extracted_path)
-                        logger.debug(f"✓ {extracted_path.name} identified as DICOM")
+                        logger.debug(f"✓ {extracted_path.name} идентифицирован как DICOM файл")
                     else:
-                        logger.debug(f"✗ {extracted_path.name} not identified as DICOM")
+                        skipped_extensions.add(extracted_path.suffix or "no_extension")
+                        logger.debug(f"✗ {extracted_path.name} не идентифицирован как DICOM файл")
                         try:
                             os.remove(extracted_path)
                         except Exception:
@@ -477,7 +626,22 @@ def extract_zip_archive(zip_path: str, extract_to: str) -> List[Path]:
                     logger.warning(f"Не удалось извлечь {file_name}: {e}")
 
         if not extracted_files:
-            raise DicomProcessingError("В архиве не найдено DICOM-файлов после фильтрации")
+            if not extracted_files:
+                if skipped_extensions:
+                    ext_list = ", ".join(sorted(skipped_extensions))
+                    raise DicomProcessingError(
+                        f"В архиве не найдено DICOM-файлов. "
+                        f"Проверено {checked_files} файлов. "
+                        f"Найденные типы файлов: {ext_list}. "
+                        f"Архив должен содержать .dcm файлы или файлы без расширения в формате DICOM."
+                    )
+                else:
+                    raise DicomProcessingError(
+                        f"В архиве не найдено файлов подходящего формата. "
+                        f"Пожалуйста, загрузите ZIP-архив с DICOM файлами."
+                    )
+
+            return extracted_files
 
         return extracted_files
 
@@ -667,6 +831,7 @@ def create_excel_report(processing_results: List[Dict[str, Any]], output_path: s
 
     for result in processing_results:
         study_metadata = result.get("study_metadata", {})
+        study_structure = study_metadata.get("StudyStructure", {})
 
         raw_status = result.get("processing_status", "Failure")
         if str(raw_status).lower() in {"completed", "success", "ok", "обработано"}:
@@ -680,10 +845,19 @@ def create_excel_report(processing_results: List[Dict[str, Any]], output_path: s
         if not pathology_type and result.get("pathology", 0) == 1:
             pathology_type = "Патология обнаружена"
 
+        study_uid = study_metadata.get("StudyInstanceUID", "")
+        series_uid = study_metadata.get("SeriesInstanceUID", "")
+
+        # Добавляем информацию о структуре
+        total_studies = study_structure.get("total_studies", 1)
+        total_series = study_structure.get("total_series", 1)
+        structure_info = f"{total_studies} study/{total_series} series"
+
         row = {
             "path_to_study": result.get("organized_path", ""),
-            "study_uid": study_metadata.get("StudyInstanceUID", ""),
-            "series_uid": study_metadata.get("SeriesInstanceUID", ""),
+            "study_uid": study_uid,
+            "series_uid": series_uid,
+            "study_structure": structure_info,
             "probability_of_pathology": round(result.get("probability_of_pathology", 0.0), 4),
             "pathology": result.get("pathology", 0),
             "processing_status": status_str,
@@ -692,6 +866,7 @@ def create_excel_report(processing_results: List[Dict[str, Any]], output_path: s
             "pathology_localization": "",
             "generation_date": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         }
+
         loc = result.get("pathology_localization_coords")
         if isinstance(loc, dict):
             # Извлекаем координаты в правильном порядке

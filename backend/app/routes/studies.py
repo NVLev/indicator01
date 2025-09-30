@@ -354,7 +354,21 @@ async def export_study_excel(
             detail="ML анализ исследования не завершен"
         )
     try:
-        # Подготавливаем данные для отчета
+        # ИСПРАВЛЕНИЕ: Используем актуальные метаданные из metadata_json
+        metadata_json = getattr(study, 'metadata_json', {}) or {}
+        study_structure = metadata_json.get('study_structure', {})
+
+        # Берем UID из обновленной структуры или fallback на старые поля
+        study_uid = metadata_json.get('primary_study_uid') or study.study_uid or ""
+        series_uid = metadata_json.get('primary_series_uid') or study.series_uid or ""
+
+        # Получаем информацию о структуре исследования
+        total_studies = study_structure.get('total_studies', 1)
+        total_series = study_structure.get('total_series', 1)
+        is_multi_study = study_structure.get('is_multi_study', False)
+        is_multi_series = study_structure.get('is_multi_series', False)
+
+        # Подготавливаем данные для отчета с ПРАВИЛЬНЫМИ UID
         study_data = {
             "organized_path": study.path_to_study or "",
             "study_metadata": {
@@ -366,7 +380,6 @@ async def export_study_excel(
             "processing_time": study.time_of_processing or 0.0,
             "probability_of_pathology": study.probability_of_pathology or 0.0,
             "pathology": study.pathology or 0,
-            # ДОБАВЬТЕ ЭТИ ПОЛЯ:
             "most_dangerous_pathology_type": study.most_dangerous_pathology_type or "",
             "pathology_localization_coords": study.pathology_localization_coords or None
         }
@@ -379,6 +392,13 @@ async def export_study_excel(
 
         filename = f"study_{study_id}_report.xlsx"
 
+        # Логируем для отладки
+        logger.info(f"📊 Создан Excel отчет для исследования {study_id}")
+        logger.info(f"  Study UID: {study_uid}")
+        logger.info(f"  Series UID: {series_uid}")
+        logger.info(f"  Структура: {total_studies} studies, {total_series} series")
+        logger.info(f"  Мульти-исследование: {is_multi_study}, Мульти-серии: {is_multi_series}")
+
         return FileResponse(
             excel_path,
             filename=filename,
@@ -386,6 +406,7 @@ async def export_study_excel(
         )
 
     except Exception as e:
+        logger.error(f"❌ Ошибка создания Excel отчета для исследования {study_id}: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Ошибка создания отчета: {str(e)}"
@@ -393,7 +414,6 @@ async def export_study_excel(
     finally:
         # Файл будет удален после отправки благодаря delete=False
         pass
-
 
 @router.post("/upload/bulk", response_model=List[StudyResponse], summary="Массовая загрузка исследований")
 async def upload_studies_bulk(
