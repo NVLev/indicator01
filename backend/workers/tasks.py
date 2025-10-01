@@ -1,6 +1,8 @@
 import os
 import time
+from pathlib import Path
 from typing import Any, Dict
+
 
 from app.core.config import settings
 from app.core.models import StudyStatus
@@ -48,6 +50,14 @@ def process_complete_study_task(
     Полный пайплайн обработки исследования: DICOM + ML анализ
     """
     from celery.exceptions import SoftTimeLimitExceeded
+
+    if not check_disk_space_before_processing():
+        error_msg = "Недостаточно места на диске для обработки. Запущена очистка, попробуйте позже."
+        logger.error(f"❌ {error_msg} для исследования {study_id}")
+        update_study_status_sync(study_id, "failed", error_msg)
+        raise Exception(error_msg)
+
+    logger.info(f"🚀 Запуск полной обработки исследования {study_id}")
 
     logger.info(f"🚀 Запуск полной обработки исследования {study_id}")
     start_time = time.time()
@@ -370,52 +380,145 @@ def _run_ml_inference_fast(organized_path: str, study_id: int) -> Dict:
 
 
 @celery_app.task(name="cleanup_old_files_task")
-def cleanup_old_files_task(days_old: int = 7):
+def cleanup_old_files_task(days_old: int = 1, emergency_cleanup: bool = False):
     """
-    Периодическая задача для очистки старых обработанных файлов
+    Умная очистка файлов:
+    - При обычном запуске: удаляет файлы старше 1 дня
+    - При нехватке места: экстренная очистка
     """
     import os
     import shutil
     from datetime import datetime, timedelta
     from pathlib import Path
 
-    logger.info(f"Запуск очистки файлов старше {days_old} дней")
+    # Проверяем свободное место
+    disk_usage = shutil.disk_usage("/")
+    free_gb = disk_usage.free / (1024 ** 3)
+    total_gb = disk_usage.total / (1024 ** 3)
+    usage_percent = (1 - free_gb / total_gb) * 100
+
+    logger.info(f"💾 Статус диска: {usage_percent:.1f}% занято, свободно {free_gb:.1f} GB")
+
+    # АВТОМАТИЧЕСКАЯ ОЧИСТКА ПРИ МАЛОМ МЕСТЕ
+    if free_gb < 5:  # Меньше 5GB свободно - экстренная очистка
+        logger.warning(f"🚨 МАЛО МЕСТА! Свободно всего {free_gb:.1f} GB. Запуск экстренной очистки!")
+        days_old = 0  # Удаляем ВСЕ файлы независимо от возраста
+        emergency_cleanup = True
 
     try:
         cutoff_date = datetime.now() - timedelta(days=days_old)
-        processed_dir = Path("processed_studies")
+        processed_dirs = [
+            Path("processed_studies"),
+            Path("/app/backend/uploads"),
+        ]
 
-        if not processed_dir.exists():
-            logger.info(
-                "Директория processed_studies не найдена - очистка не требуется"
-            )
-            return {"cleaned_directories": 0}
+        total_cleaned = 0
+        total_freed_space = 0
 
-        cleaned_count = 0
-        for study_dir in processed_dir.iterdir():
-            if study_dir.is_dir():
-                mod_time = datetime.fromtimestamp(study_dir.stat().st_mtime)
-                if mod_time < cutoff_date:
-                    try:
-                        shutil.rmtree(study_dir)
-                        cleaned_count += 1
-                        logger.info(f"Очищена старая директория: {study_dir.name}")
-                    except Exception as e:
-                        logger.warning(f"Не удалось очистить {study_dir.name}: {e}")
+        for base_dir in processed_dirs:
+            if not base_dir.exists():
+                continue
 
-        logger.info(f"Очистка завершена. Удалено директорий: {cleaned_count}")
-        return {"cleaned_directories": cleaned_count, "days_old": days_old}
+            # Сортируем по времени модификации (старые сначала)
+            items = []
+            for item in base_dir.iterdir():
+                try:
+                    mod_time = datetime.fromtimestamp(item.stat().st_mtime)
+                    items.append((item, mod_time))
+                except:
+                    continue
+
+            # Сортируем: старые файлы первыми для удаления
+            items.sort(key=lambda x: x[1])
+
+            for item, mod_time in items:
+                try:
+                    # В экстренном режиме удаляем ВСЕ, иначе только старые
+                    if emergency_cleanup or mod_time < cutoff_date:
+                        if item.is_dir():
+                            dir_size = _get_directory_size(item)
+                            shutil.rmtree(item)
+                            total_cleaned += 1
+                            total_freed_space += dir_size
+                            logger.info(f"🗑️ Удалено: {item.name} ({dir_size / 1024 / 1024:.1f} MB)")
+
+                        elif item.is_file() and item.suffix in ['.zip', '.tmp']:
+                            file_size = item.stat().st_size
+                            item.unlink()
+                            total_cleaned += 1
+                            total_freed_space += file_size
+                            logger.info(f"🗑️ Удален файл: {item.name} ({file_size / 1024 / 1024:.1f} MB)")
+
+                        # Проверяем, освободилось ли достаточно места
+                        if emergency_cleanup:
+                            current_free = shutil.disk_usage("/").free / (1024 ** 3)
+                            if current_free > 10:  # Освободили до 10GB - останавливаемся
+                                logger.info(f"✅ Освобождено достаточно места: {current_free:.1f} GB")
+                                break
+
+                except Exception as e:
+                    logger.warning(f"Не удалось удалить {item}: {e}")
+
+        final_free_gb = shutil.disk_usage("/").free / (1024 ** 3)
+        logger.info(
+            f"✅ Очистка завершена. Удалено: {total_cleaned} объектов, освобождено: {total_freed_space / 1024 / 1024:.1f} MB")
+        logger.info(f"💾 Теперь свободно: {final_free_gb:.1f} GB")
+
+        return {
+            "cleaned_items": total_cleaned,
+            "freed_space_mb": round(total_freed_space / 1024 / 1024, 1),
+            "free_space_before_gb": round(free_gb, 1),
+            "free_space_after_gb": round(final_free_gb, 1),
+            "emergency_cleanup": emergency_cleanup,
+            "days_old": days_old
+        }
 
     except Exception as e:
-        logger.exception(f"Ошибка при очистке файлов: {e}")
-        raise
+        logger.exception(f"❌ Ошибка при очистке файлов: {e}")
+        return {"error": str(e)}
+
+
+def _get_directory_size(path: Path) -> int:
+    """Вычисляет размер директории в байтах"""
+    total_size = 0
+    try:
+        for file_path in path.rglob('*'):
+            if file_path.is_file():
+                total_size += file_path.stat().st_size
+    except:
+        pass
+    return total_size
+
+
+# Мониторинг диска перед каждой обработкой
+def check_disk_space_before_processing():
+    """Проверяет место перед обработкой нового исследования"""
+    import shutil
+
+    disk_usage = shutil.disk_usage("/")
+    free_gb = disk_usage.free / (1024 ** 3)
+
+    if free_gb < 2:  # Меньше 2GB - срочно чистим
+        logger.warning(f"🚨 КРИТИЧЕСКИ МАЛО МЕСТА! Всего {free_gb:.1f} GB. Запуск очистки...")
+        cleanup_old_files_task.delay(0, True)  # Экстренная очистка
+        return False
+    elif free_gb < 5:  # Меньше 5GB - предупредительная очистка
+        logger.warning(f"⚠️ Мало свободного места: {free_gb:.1f} GB. Запуск очистки...")
+        cleanup_old_files_task.delay(1, False)
+
+    return True
 
 
 # Конфигурация периодических задач
 celery_app.conf.beat_schedule = {
-    "cleanup-old-files-daily": {
+    "cleanup-old-files-hourly": {
         "task": "cleanup_old_files_task",
-        "schedule": 24 * 60 * 60.0,
-        "args": (7,),
+        "schedule": 60 * 60.0,
+        "args": (1, False),
+    },
+    "monitor-disk-space": {
+        "task": "cleanup_old_files_task",
+        "schedule": 30 * 60.0,
+        "args": (0, True),
     },
 }
