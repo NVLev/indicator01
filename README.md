@@ -63,24 +63,8 @@
 
    📖 Подробная спецификация API приведена в файле **API_SPEC_FULL.md**.
 
-3. **Локальный запуск у проверяющих**  
-   -  Клонировать репозиторий по адресу [https://github.com/NVLev/indicator01](https://github.com/NVLev/indicator01)
-   - Запустить локально, без ограничений по серверу.  
-   - Демо-интерфейс будет доступен по адресу: [http://localhost:8000/demo/](http://localhost:8000/demo/)  
-   - Api интерфейс будет доступен по адресу - [http://localhost:8000/docs](http://localhost:8000/docs)
-   - Подробную информацию о ходе обработке можно будет увидеть в логах, запустив 
-   - - Для отслеживания работы модели
-   ```bash
-   docker compose logs -f ml_service
-   ```
-   - - Для отслеживания общей обработки и верификации
-   ```bash
-   docker compose logs -f celery_worker
-   ```
-
-   Это рекомендуется для проверки на больших объёмах (например, 200+ архивов).  
-
 ---
+## Запуск локально
 
 ## 🖥️ Системные требования
 ### Минимальные
@@ -94,9 +78,7 @@
 - 50+ GB свободного места
 - NVIDIA GPU (8 GB+) при использовании полной ML-модели
 
----
-
-## 🚀 Быстрый старт (локально)
+## 🚀 Быстрый старт (локально, рекомендуется для проверки на больших объёмах (например, 200+ архивов).)
 1. **Клонирование репозитория:**
    ```bash
    git clone https://github.com/NVLev/indicator01
@@ -108,18 +90,74 @@ cp .env.template .env
 # Отредактируйте .env при необходимости
 ```
 3. **Запуск сервисов:**
+####Перед первым запуском выполните сборку образов:
 ```bash
-docker compose up -d
+docker compose build
 ```
+### Запуск БД и выполнение миграций:
 
+```bash
+docker compose --profile migrations up -d
+```
+- или пошагово
+- 
+```bash
+# Запуск базы данных
+docker compose up pg -d
+
+# Выполнение миграций
+docker compose --profile migrations run --rm alembic alembic upgrade head
+
+# Запуск всех сервисов
+docker compose up -d
+
+# Просмотр логов
+docker compose logs -f
+docker compose logs -f backend
+docker compose logs -f ml_service
+docker compose logs -f celery_worker
+```
 4. Проверка работы:
-   - [http://localhost:8000/demo](http://localhost:8000/demo)  
-   - [http://localhost:8000/docs](http://localhost:8000/docs)  
+   - Демо-интерфейс будет доступен по адресу: [http://localhost:8000/demo/](http://localhost:8000/demo/)  
+   - Api интерфейс будет доступен по адресу - [http://localhost:8000/docs](http://localhost:8000/docs)
+   - Подробную информацию о ходе обработке можно будет увидеть в логах, запустив 
+     - - Для отслеживания работы модели
+     ```bash
+     
+     docker compose logs -f backend
+     docker compose logs -f ml_service
+     docker compose logs -f
+     docker compose logs -f celery_worker
+     ```
+
 
 ---
 
+
+
 ## 📊 Функции API
-- `POST /auth/login` — авторизация
+### 🔐 Аутентификация
+- `POST /auth/register` - Регистрация пользователя
+- `POST /auth/login` - Авторизация и получение JWT токена
+### 📁 Управление исследованиями
+
+#### Загрузка исследований
+- `POST /studies/upload` - Загрузка одного исследования (ZIP архив)
+- `POST /studies/upload/bulk` - Массовая загрузка до 20 исследований
+
+#### Получение информации об исследованиях
+- `GET /studies/` - Список исследований пользователя с пагинацией
+- `GET /studies/{study_id}` - Детальная информация о конкретном исследовании
+- `GET /studies/{study_id}/progress` - Прогресс обработки исследования
+
+#### Экспорт и визуализация
+- `GET /studies/{study_id}/export` - Экспорт результатов в Excel (формат по ТЗ)
+- `GET /studies/{study_id}/heatmap` - Получение PNG heatmap визуализации
+
+#### Управление исследованиями
+- `POST /studies/{study_id}/retry` - Повторная обработка неудачного исследования
+- `DELETE /studies/{study_id}` - Удаление исследования и связанных файлов
+
 - `POST /studies/upload` — загрузка исследования
 - `GET /studies/{id}/progress` — прогресс обработки
 - `GET /studies/{id}/heatmap` — визуализация heatmap
