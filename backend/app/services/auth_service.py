@@ -1,17 +1,18 @@
 from datetime import datetime, timedelta, timezone
-from typing import Optional, Any, Coroutine
+from typing import Any, Coroutine, Optional
 from uuid import uuid4
+
+from fastapi import Depends, HTTPException, status
+from jose import JWTError, jwt
+from passlib.context import CryptContext
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.future import select
+from sqlalchemy.orm import selectinload
 
 from ..core.config import settings
 from ..core.db_helper import db_helper
 from ..core.models import RefreshToken, User
 from ..core.schemas import UserCreate
-from fastapi import Depends, HTTPException, status
-from jose import jwt, JWTError
-from passlib.context import CryptContext
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.future import select
-from sqlalchemy.orm import selectinload
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
@@ -97,7 +98,7 @@ class AuthService:
         jti: str,
         issued_at: datetime,
         expires_at: datetime,
-        session: AsyncSession
+        session: AsyncSession,
     ):
         """
         Сохраняет refresh-токен в БД.
@@ -128,9 +129,9 @@ class AuthService:
 
     @classmethod
     async def register(
-            cls,
-            user_data: UserCreate,
-            session: AsyncSession = Depends(db_helper.session_getter),
+        cls,
+        user_data: UserCreate,
+        session: AsyncSession = Depends(db_helper.session_getter),
     ) -> User:
         """
         Регистрация нового пользователя.
@@ -144,8 +145,7 @@ class AuthService:
         )
         if existing_user.scalar_one_or_none():
             raise HTTPException(
-                status_code=400,
-                detail="Пользователь с таким email уже существует"
+                status_code=400, detail="Пользователь с таким email уже существует"
             )
 
         user = User(
@@ -162,8 +162,7 @@ class AuthService:
         except Exception as e:
             await session.rollback()
             raise HTTPException(
-                status_code=500,
-                detail=f"Ошибка при создании пользователя: {str(e)}"
+                status_code=500, detail=f"Ошибка при создании пользователя: {str(e)}"
             )
 
     @classmethod
@@ -178,15 +177,11 @@ class AuthService:
         :return: str: JWT-токен доступа
         """
         if not email or not password:
-            raise HTTPException(
-                status_code=400, detail="Email и пароль обязательны"
-            )
+            raise HTTPException(status_code=400, detail="Email и пароль обязательны")
         stmt = (
             select(User)
             .where(User.email == email)
-            .options(
-                selectinload(User.refresh_tokens)
-            )
+            .options(selectinload(User.refresh_tokens))
             .execution_options(populate_existing=True)
         )
         result = await session.execute(stmt)
@@ -195,9 +190,7 @@ class AuthService:
             raise HTTPException(status_code=401, detail="Неверный email или пароль")
 
         if not user.is_active:
-            raise HTTPException(
-                status_code=403, detail="Аккаунт деактивирован"
-            )
+            raise HTTPException(status_code=403, detail="Аккаунт деактивирован")
         access_token = cls.create_access_token({"sub": str(user.id)})
         refresh_token, jti, issued_at, expires_at = cls.create_refresh_token(user.id)
 
@@ -209,7 +202,7 @@ class AuthService:
             "access_token": access_token,
             "refresh_token": refresh_token,
             "token_type": "bearer",
-            "user_id": user.id
+            "user_id": user.id,
         }
 
     @classmethod
@@ -223,7 +216,7 @@ class AuthService:
             payload = jwt.decode(
                 refresh_token,
                 settings.auth.secret_key,
-                algorithms=[settings.auth.algorithm]
+                algorithms=[settings.auth.algorithm],
             )
             if payload.get("type") != "refresh":
                 return None
@@ -253,4 +246,3 @@ class AuthService:
             return None
 
         return user_id
-

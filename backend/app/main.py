@@ -1,12 +1,14 @@
 import os
+from contextlib import asynccontextmanager
+from pathlib import Path
+
 import uvicorn
 from fastapi import FastAPI
-from contextlib import asynccontextmanager
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
-from pathlib import Path
-from .routes import auth, studies, demo
+
 from .core.db_helper import db_helper
+from .routes import auth, demo, studies
 
 
 @asynccontextmanager
@@ -53,31 +55,32 @@ async def create_demo_user():
 
                 # Создаем пользователя
                 demo_user = User(
-                    email="demo@test.com",
-                    pass_hash=password_hash,
-                    is_active=True
+                    email="demo@test.com", pass_hash=password_hash, is_active=True
                 )
                 session.add(demo_user)
                 await session.commit()
                 await session.refresh(demo_user)
-                print(f"✅ Создан демо-пользователь: {demo_user.email} (ID: {demo_user.id})")
+                print(
+                    f"✅ Создан демо-пользователь: {demo_user.email} (ID: {demo_user.id})"
+                )
             else:
                 demo_user = existing_user
-                print(f"✅ Демо-пользователь уже существует: {demo_user.email} (ID: {demo_user.id})")
+                print(
+                    f"✅ Демо-пользователь уже существует: {demo_user.email} (ID: {demo_user.id})"
+                )
 
             # ✅ ПОЛУЧАЕМ JWT ТОКЕНЫ через AuthService
             auth_result = await AuthService.authenticate(
-                email="demo@test.com",
-                password="demo_password_123",
-                session=session
+                email="demo@test.com", password="demo_password_123", session=session
             )
 
             # ✅ СОХРАНЯЕМ В DemoService
             from app.services.demo_service import DemoService
+
             DemoService.set_demo_data(demo_user, auth_result)
 
             print(f"✅ Получены JWT токены для демо-режима")
-            if auth_result and 'access_token' in auth_result:
+            if auth_result and "access_token" in auth_result:
                 print(f"   Access Token: {auth_result['access_token'][:50]}...")
             else:
                 print("   ⚠️ Токены не получены")
@@ -87,7 +90,9 @@ async def create_demo_user():
     except Exception as e:
         print(f"⚠️ Не удалось создать демо-пользователя/токены: {e}")
         import traceback
+
         traceback.print_exc()
+
 
 # ---------------КОНЕЦ БЛОКА-------------------------
 

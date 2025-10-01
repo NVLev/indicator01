@@ -1,11 +1,13 @@
-import os
-import requests
-import numpy as np
 import json
-from pathlib import Path
 import logging
+import os
+from pathlib import Path
+
+import numpy as np
+import requests
 
 logger = logging.getLogger(__name__)
+
 
 class MLInferenceService:
     """
@@ -15,7 +17,9 @@ class MLInferenceService:
 
     def __init__(self, service_url: str = None):
         # URL сервиса ML (имя контейнера из docker-compose.yml)
-        self.service_url = service_url or os.getenv("ML_SERVICE_URL", "http://ml_service:8501")
+        self.service_url = service_url or os.getenv(
+            "ML_SERVICE_URL", "http://ml_service:8501"
+        )
         self.processed_dir = os.getenv("PROCESSED_DIR", "/app/processed_studies")
 
     def analyze_study(self, organized_study_path: str, study_id: int) -> dict:
@@ -37,7 +41,9 @@ class MLInferenceService:
             # Если путь относительный, проверяем не начинается ли он уже с processed_studies
             if organized_study_path.startswith("processed_studies/"):
                 # Убираем лишнюю часть пути
-                relative_path = organized_study_path.replace("processed_studies/", "", 1)
+                relative_path = organized_study_path.replace(
+                    "processed_studies/", "", 1
+                )
                 final_path = Path(self.processed_dir) / relative_path
             else:
                 final_path = Path(self.processed_dir) / organized_study_path
@@ -51,7 +57,9 @@ class MLInferenceService:
             # Попробуем найти файлы вручную
             try:
                 possible_paths = list(Path(self.processed_dir).rglob("*"))
-                logger.info(f"🔍 Доступные пути в {self.processed_dir}: {[str(p) for p in possible_paths[:10]]}")
+                logger.info(
+                    f"🔍 Доступные пути в {self.processed_dir}: {[str(p) for p in possible_paths[:10]]}"
+                )
             except Exception as e:
                 logger.error(f"Не удалось просканировать директорию: {e}")
             return {
@@ -90,7 +98,11 @@ class MLInferenceService:
             "study_id": study_id,
             "probability_of_pathology": ds_result.get("probability_of_pathology", 0.0),
             "pathology": ds_result.get("pathology_class", 0),
-            "processing_status": "completed" if ds_result.get("processing_status") == "Success" else "failed",
+            "processing_status": (
+                "completed"
+                if ds_result.get("processing_status") == "Success"
+                else "failed"
+            ),
             "ml_processing_time": ds_result.get("processing_time_seconds", 0.0),
             "reconstruction_error": ds_result.get("reconstruction_error", 0.0),
         }
@@ -99,11 +111,15 @@ class MLInferenceService:
         heatmap_data = ds_result.get("heatmap_data", {})
         if heatmap_data:
             # Сохраняем все данные из heatmap_data
-            formatted.update({
-                "heatmap_statistics": heatmap_data.get("heatmap_statistics", {}),
-                "max_error_slice_index": heatmap_data.get("max_error_slice_index", 0),
-                "heatmap_shape": heatmap_data.get("error_map_shape", []),
-            })
+            formatted.update(
+                {
+                    "heatmap_statistics": heatmap_data.get("heatmap_statistics", {}),
+                    "max_error_slice_index": heatmap_data.get(
+                        "max_error_slice_index", 0
+                    ),
+                    "heatmap_shape": heatmap_data.get("error_map_shape", []),
+                }
+            )
 
             # Сохраняем ВСЕ heatmap_data для передачи в Celery
             formatted["heatmap_data"] = heatmap_data
@@ -119,7 +135,9 @@ class MLInferenceService:
     def _save_heatmap_data(self, heatmap_data: dict, study_id: int) -> str:
         """Сохраняет heatmap данные в файл включая PNG визуализацию"""
         try:
-            heatmap_dir = Path("/app/processed_studies") / f"study_{study_id}" / "heatmaps"
+            heatmap_dir = (
+                Path("/app/processed_studies") / f"study_{study_id}" / "heatmaps"
+            )
             heatmap_dir.mkdir(parents=True, exist_ok=True)
 
             # Сохраняем error_map если есть как numpy array
@@ -127,13 +145,16 @@ class MLInferenceService:
             if error_map_3d:
                 error_map_array = np.array(error_map_3d)
                 np.save(heatmap_dir / "error_map.npy", error_map_array)
-                logger.info(f"✅ Сохранен error_map.npy с формой {error_map_array.shape}")
+                logger.info(
+                    f"✅ Сохранен error_map.npy с формой {error_map_array.shape}"
+                )
 
             # Сохраняем PNG визуализацию если есть
             visualization_png = heatmap_data.get("visualization_png")
             if visualization_png:
                 try:
                     import base64
+
                     png_data = base64.b64decode(visualization_png)
                     with open(heatmap_dir / "heatmap_visualization.png", "wb") as f:
                         f.write(png_data)
@@ -144,11 +165,17 @@ class MLInferenceService:
             # Сохраняем статистику
             stats = heatmap_data.get("heatmap_statistics", {})
             with open(heatmap_dir / "heatmap_stats.json", "w") as f:
-                json.dump({
-                    "statistics": stats,
-                    "max_error_slice_index": heatmap_data.get("max_error_slice_index", 0),
-                    "shape": heatmap_data.get("error_map_shape", [])
-                }, f, indent=2)
+                json.dump(
+                    {
+                        "statistics": stats,
+                        "max_error_slice_index": heatmap_data.get(
+                            "max_error_slice_index", 0
+                        ),
+                        "shape": heatmap_data.get("error_map_shape", []),
+                    },
+                    f,
+                    indent=2,
+                )
 
             logger.info(f"✅ Heatmap данные сохранены в {heatmap_dir}")
             return str(heatmap_dir)

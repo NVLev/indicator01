@@ -7,29 +7,33 @@ Original file is located at
     https://colab.research.google.com/drive/1zr5eOW5001fXVJh3G8OVzH-imwvHgb8b
 """
 
+import json
 import os
+import tempfile
 import zipfile
+from pathlib import Path
+
+import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-import tensorflow as tf
-from tensorflow.keras import layers, models, callbacks
-from pathlib import Path
-import tempfile
-import SimpleITK as sitk
-from sklearn.model_selection import train_test_split
-import matplotlib.pyplot as plt
-import json
 import pydicom
+import SimpleITK as sitk
+import tensorflow as tf
 from scipy.ndimage import zoom
+from sklearn.model_selection import train_test_split
+from tensorflow.keras import callbacks, layers, models
+
 
 # Создаем кастомную функцию MSE для совместимости
 def custom_mse(y_true, y_pred):
     return tf.reduce_mean(tf.square(y_true - y_pred))
 
+
 class CTDataLoader:
     """
     Класс для загрузки и обработки данных из ZIP-архивов.
     """
+
     def __init__(self, target_size=(128, 128, 64)):
         self.target_size = target_size
         self.preprocessed_data = {}
@@ -43,7 +47,7 @@ class CTDataLoader:
 
         with tempfile.TemporaryDirectory() as tmpdir:
             # Извлечение архива
-            with zipfile.ZipFile(zip_path, 'r') as zip_ref:
+            with zipfile.ZipFile(zip_path, "r") as zip_ref:
                 zip_ref.extractall(tmpdir)
 
             # Диагностика: что извлеклось
@@ -64,7 +68,9 @@ class CTDataLoader:
 
             for i, study_dir in enumerate(study_dirs):
                 try:
-                    print(f"Обработка исследования {i + 1}/{len(study_dirs)}: {study_dir}")
+                    print(
+                        f"Обработка исследования {i + 1}/{len(study_dirs)}: {study_dir}"
+                    )
 
                     # Загрузка DICOM серии
                     sitk_image = self.load_dicom_series(study_dir)
@@ -99,7 +105,7 @@ class CTDataLoader:
         try:
             # Получаем все файлы в папке
             all_files = list(Path(directory_path).iterdir())
-            files = [f for f in all_files if f.is_file() and not f.name.startswith('.')]
+            files = [f for f in all_files if f.is_file() and not f.name.startswith(".")]
 
             if not files:
                 print(f"Нет файлов в {directory_path}")
@@ -114,7 +120,9 @@ class CTDataLoader:
                     dicom_files.append(str(file_path))
 
             if not dicom_files:
-                print("Не найдено DICOM файлов по сигнатуре, пробуем загрузить все файлы...")
+                print(
+                    "Не найдено DICOM файлов по сигнатуре, пробуем загрузить все файлы..."
+                )
                 dicom_files = [str(f) for f in files]
 
             print(f"Загружаем {len(dicom_files)} файлов как DICOM")
@@ -152,7 +160,7 @@ class CTDataLoader:
         zoom_factors = [
             self.target_size[0] / image_array.shape[0],
             self.target_size[1] / image_array.shape[1],
-            self.target_size[2] / image_array.shape[2]
+            self.target_size[2] / image_array.shape[2],
         ]
         image_array_resized = zoom(image_array, zoom_factors, order=1)
 
@@ -162,6 +170,7 @@ class CTDataLoader:
         image_array_resized = np.expand_dims(image_array_resized, axis=-1)
         return image_array_resized
 
+
 def create_autoencoder(input_shape=(128, 128, 64, 1)):
     """
     Создает 3D автоэнкодер с оптимизированной архитектурой.
@@ -169,26 +178,27 @@ def create_autoencoder(input_shape=(128, 128, 64, 1)):
     inputs = layers.Input(shape=input_shape)
 
     # Энкодер
-    x = layers.Conv3D(16, (3, 3, 3), activation='relu', padding='same')(inputs)
-    x = layers.MaxPooling3D((2, 2, 2), padding='same')(x)
-    x = layers.Conv3D(32, (3, 3, 3), activation='relu', padding='same')(x)
-    x = layers.MaxPooling3D((2, 2, 2), padding='same')(x)
-    x = layers.Conv3D(64, (3, 3, 3), activation='relu', padding='same')(x)
-    encoded = layers.MaxPooling3D((2, 2, 2), padding='same')(x)
+    x = layers.Conv3D(16, (3, 3, 3), activation="relu", padding="same")(inputs)
+    x = layers.MaxPooling3D((2, 2, 2), padding="same")(x)
+    x = layers.Conv3D(32, (3, 3, 3), activation="relu", padding="same")(x)
+    x = layers.MaxPooling3D((2, 2, 2), padding="same")(x)
+    x = layers.Conv3D(64, (3, 3, 3), activation="relu", padding="same")(x)
+    encoded = layers.MaxPooling3D((2, 2, 2), padding="same")(x)
 
     # Декодер
-    x = layers.Conv3D(64, (3, 3, 3), activation='relu', padding='same')(encoded)
+    x = layers.Conv3D(64, (3, 3, 3), activation="relu", padding="same")(encoded)
     x = layers.UpSampling3D((2, 2, 2))(x)
-    x = layers.Conv3D(32, (3, 3, 3), activation='relu', padding='same')(x)
+    x = layers.Conv3D(32, (3, 3, 3), activation="relu", padding="same")(x)
     x = layers.UpSampling3D((2, 2, 2))(x)
-    x = layers.Conv3D(16, (3, 3, 3), activation='relu', padding='same')(x)
+    x = layers.Conv3D(16, (3, 3, 3), activation="relu", padding="same")(x)
     x = layers.UpSampling3D((2, 2, 2))(x)
-    decoded = layers.Conv3D(1, (3, 3, 3), activation='sigmoid', padding='same')(x)
+    decoded = layers.Conv3D(1, (3, 3, 3), activation="sigmoid", padding="same")(x)
 
     autoencoder = models.Model(inputs, decoded)
-    autoencoder.compile(optimizer='adam', loss=custom_mse)
+    autoencoder.compile(optimizer="adam", loss=custom_mse)
 
     return autoencoder
+
 
 def augment_data(volume):
     """Аугментация 3D данных для создания дополнительных образцов."""
@@ -203,7 +213,7 @@ def augment_data(volume):
         lambda x: np.flip(np.flip(x, axis=0), axis=1),
         lambda x: np.flip(np.flip(x, axis=0), axis=2),
         lambda x: np.flip(np.flip(x, axis=1), axis=2),
-        lambda x: np.flip(np.flip(np.flip(x, axis=0), axis=1), axis=2)
+        lambda x: np.flip(np.flip(np.flip(x, axis=0), axis=1), axis=2),
     ]
 
     # Применяем преобразования
@@ -220,6 +230,7 @@ def augment_data(volume):
 
     return augmented_volumes
 
+
 def calculate_reconstruction_errors(model, data):
     """Вычисление ошибок реконструкции."""
     errors = []
@@ -230,13 +241,14 @@ def calculate_reconstruction_errors(model, data):
         errors.append(mse)
     return errors
 
+
 def main():
     # Конфигурация
     data_config = {
-        'norma': '/content/norma_anon.zip',
-        'pneumonia': '/content/pneumonia_anon.zip',
-        'pneumotorax': '/content/pneumotorax_anon.zip',
-        'covid_19':'/content/CT_COVID19.zip'
+        "norma": "/content/norma_anon.zip",
+        "pneumonia": "/content/pneumonia_anon.zip",
+        "pneumotorax": "/content/pneumotorax_anon.zip",
+        "covid_19": "/content/CT_COVID19.zip",
     }
 
     # Используем новый формат .keras
@@ -252,25 +264,31 @@ def main():
     pathology_data = []
 
     # Загружаем данные пневмонии для обучения
-    if data_config.get('pneumonia'):
+    if data_config.get("pneumonia"):
         try:
-            pneumonia_data = data_loader.extract_and_load_zip(data_config['pneumonia'], 'pneumonia')
+            pneumonia_data = data_loader.extract_and_load_zip(
+                data_config["pneumonia"], "pneumonia"
+            )
             pathology_data.extend(pneumonia_data)
         except Exception as e:
             print(f"Ошибка загрузки pneumonia данных: {e}")
 
     # Загружаем данные пневмоторакса для обучения
-    if data_config.get('pneumotorax'):
+    if data_config.get("pneumotorax"):
         try:
-            pneumotorax_data = data_loader.extract_and_load_zip(data_config['pneumotorax'], 'pneumotorax')
+            pneumotorax_data = data_loader.extract_and_load_zip(
+                data_config["pneumotorax"], "pneumotorax"
+            )
             pathology_data.extend(pneumotorax_data)
         except Exception as e:
             print(f"Ошибка загрузки pneumotorax данных: {e}")
 
-             # Загружаем данные пневмоторакса для обучения
-    if data_config.get('covid_19'):
+            # Загружаем данные пневмоторакса для обучения
+    if data_config.get("covid_19"):
         try:
-            covid_19_data = data_loader.extract_and_load_zip(data_config['covid_19'], 'covid_19')
+            covid_19_data = data_loader.extract_and_load_zip(
+                data_config["covid_19"], "covid_19"
+            )
             pathology_data.extend(covid_19_data)
         except Exception as e:
             print(f"Ошибка загрузки covid_19 данных: {e}")
@@ -301,20 +319,27 @@ def main():
     autoencoder.summary()
 
     # Callbacks
-    early_stopping = callbacks.EarlyStopping(monitor='val_loss', patience=5, restore_best_weights=True)
-    reduce_lr = callbacks.ReduceLROnPlateau(monitor='val_loss', factor=0.2, patience=3, min_lr=1e-6)
-    checkpoint = callbacks.ModelCheckpoint('best_pathology_model.keras', monitor='val_loss', save_best_only=True)
+    early_stopping = callbacks.EarlyStopping(
+        monitor="val_loss", patience=5, restore_best_weights=True
+    )
+    reduce_lr = callbacks.ReduceLROnPlateau(
+        monitor="val_loss", factor=0.2, patience=3, min_lr=1e-6
+    )
+    checkpoint = callbacks.ModelCheckpoint(
+        "best_pathology_model.keras", monitor="val_loss", save_best_only=True
+    )
 
     print("Начало обучения автоэнкодера на данных с патологиями...")
 
     history = autoencoder.fit(
-        X_train, X_train,
+        X_train,
+        X_train,
         batch_size=batch_size,
         epochs=epochs,
         validation_data=(X_val, X_val),
         callbacks=[early_stopping, reduce_lr, checkpoint],
         shuffle=True,
-        verbose=1
+        verbose=1,
     )
 
     # Сохранение модели
@@ -324,38 +349,47 @@ def main():
     # Визуализация обучения
     plt.figure(figsize=(12, 4))
     plt.subplot(1, 2, 1)
-    plt.plot(history.history['loss'], label='Training Loss')
-    if 'val_loss' in history.history:
-        plt.plot(history.history['val_loss'], label='Validation Loss')
+    plt.plot(history.history["loss"], label="Training Loss")
+    if "val_loss" in history.history:
+        plt.plot(history.history["val_loss"], label="Validation Loss")
     plt.legend()
-    plt.title('Model Loss')
+    plt.title("Model Loss")
 
     plt.subplot(1, 2, 2)
-    if 'lr' in history.history:
-        plt.plot(history.history['lr'], label='Learning Rate')
+    if "lr" in history.history:
+        plt.plot(history.history["lr"], label="Learning Rate")
         plt.legend()
-        plt.title('Learning Rate Schedule')
+        plt.title("Learning Rate Schedule")
     else:
-        plt.text(0.5, 0.5, 'Learning Rate data not available',
-                horizontalalignment='center', verticalalignment='center')
-        plt.title('Learning Rate Schedule')
+        plt.text(
+            0.5,
+            0.5,
+            "Learning Rate data not available",
+            horizontalalignment="center",
+            verticalalignment="center",
+        )
+        plt.title("Learning Rate Schedule")
 
-    plt.savefig('pathology_training_history.png')
+    plt.savefig("pathology_training_history.png")
     plt.close()
 
     # Загрузка нормальных данных для определения порога
     print("Загрузка нормальных данных для определения порога...")
     normal_data = []
 
-    if data_config.get('norma'):
+    if data_config.get("norma"):
         try:
-            normal_data = data_loader.extract_and_load_zip(data_config['norma'], 'norma')
+            normal_data = data_loader.extract_and_load_zip(
+                data_config["norma"], "norma"
+            )
         except Exception as e:
             print(f"Ошибка загрузки нормальных данных: {e}")
 
     # Вычисление ошибок реконструкции
     pathology_errors = calculate_reconstruction_errors(autoencoder, X_val)
-    normal_errors = calculate_reconstruction_errors(autoencoder, normal_data) if normal_data else []
+    normal_errors = (
+        calculate_reconstruction_errors(autoencoder, normal_data) if normal_data else []
+    )
 
     # Определение оптимального порога
     if not normal_errors:
@@ -363,7 +397,9 @@ def main():
         # Используем статистику патологических данных для установки порога
         mean_error = np.mean(pathology_errors)
         std_error = np.std(pathology_errors)
-        optimal_threshold = mean_error - 2 * std_error  # Нормальные данные должны иметь меньшую ошибку
+        optimal_threshold = (
+            mean_error - 2 * std_error
+        )  # Нормальные данные должны иметь меньшую ошибку
     else:
         # ROC анализ для определения порога
         from sklearn.metrics import roc_curve
@@ -379,21 +415,26 @@ def main():
     print(f"Оптимальный порог: {optimal_threshold:.6f}")
 
     # Сохранение порога
-    with open(threshold_save_path, 'w') as f:
-        json.dump({'optimal_threshold': float(optimal_threshold)}, f)
+    with open(threshold_save_path, "w") as f:
+        json.dump({"optimal_threshold": float(optimal_threshold)}, f)
 
     # Визуализация распределения ошибок
     plt.figure(figsize=(10, 6))
     if pathology_errors:
-        plt.hist(pathology_errors, bins=30, alpha=0.7, label='Патологии', density=True)
+        plt.hist(pathology_errors, bins=30, alpha=0.7, label="Патологии", density=True)
     if normal_errors:
-        plt.hist(normal_errors, bins=30, alpha=0.7, label='Норма', density=True)
-    plt.axvline(optimal_threshold, color='red', linestyle='--', label=f'Порог: {optimal_threshold:.6f}')
-    plt.xlabel('Ошибка реконструкции (MSE)')
-    plt.ylabel('Плотность')
-    plt.title('Распределение ошибок реконструкции (обучение на патологиях)')
+        plt.hist(normal_errors, bins=30, alpha=0.7, label="Норма", density=True)
+    plt.axvline(
+        optimal_threshold,
+        color="red",
+        linestyle="--",
+        label=f"Порог: {optimal_threshold:.6f}",
+    )
+    plt.xlabel("Ошибка реконструкции (MSE)")
+    plt.ylabel("Плотность")
+    plt.title("Распределение ошибок реконструкции (обучение на патологиях)")
     plt.legend()
-    plt.savefig('pathology_error_distribution.png')
+    plt.savefig("pathology_error_distribution.png")
     plt.close()
 
     print("Скрипт завершен успешно!")
@@ -402,6 +443,7 @@ def main():
     print("Примечание: Модель обучена на патологических данных, поэтому:")
     print("- Нормальные данные будут иметь более высокую ошибку реконструкции")
     print("- Порог используется для обнаружения нормальных случаев")
+
 
 if __name__ == "__main__":
     main()

@@ -1,17 +1,17 @@
-import os
-import logging
-import traceback
 import asyncio
+import logging
+import os
+import traceback
 from contextlib import asynccontextmanager
-from typing import Optional, Dict, Any
-from fastapi import FastAPI, HTTPException
-from pydantic import BaseModel
 from pathlib import Path
 from threading import Lock
+from typing import Any, Dict, Optional
 
+from fastapi import FastAPI, HTTPException
 
 # Импорт твоего процессора инференса (в Dockerfile.ml PYTHONPATH=/app, ML_model в /app/ML_model)
 from ML_model.Inference_with_heatmap import CTInferenceProcessor
+from pydantic import BaseModel
 
 logger = logging.getLogger("ml_service")
 logging.basicConfig(level=logging.INFO)
@@ -20,7 +20,6 @@ logging.basicConfig(level=logging.INFO)
 MODEL_PATH = os.getenv("MODEL_PATH", "/app/ML_model/best_pathology_model.keras")
 THRESHOLD_PATH = os.getenv("THRESHOLD_PATH", "/app/ML_model/pathology_threshold.json")
 PROCESSED_DIR = os.getenv("PROCESSED_DIR", "/app/processed_studies")
-
 
 
 # Глобальный процессор и Lock для безопасного доступа (TensorFlow не всегда потокобезопасен)
@@ -37,8 +36,8 @@ class PredictRequest(BaseModel):
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """
-        Контекстный менеджер для управления жизненным циклом приложения
-        """
+    Контекстный менеджер для управления жизненным циклом приложения
+    """
     global processor, ready
     logger.info("Запуск ML сервиса, загрузка модели...")
     processor = CTInferenceProcessor()
@@ -54,10 +53,10 @@ async def lifespan(app: FastAPI):
         logger.error("Ошибка загрузки модели при запуске:\n" + traceback.format_exc())
         ready = False
     yield
-app = FastAPI(
-    title="ML Сервис для анализа медицинских изображений",
-    lifespan=lifespan
-)
+
+
+app = FastAPI(title="ML Сервис для анализа медицинских изображений", lifespan=lifespan)
+
 
 @app.get("/health")
 def health():
@@ -81,11 +80,11 @@ def model_info():
         "model_path": MODEL_PATH,
         "threshold_path": THRESHOLD_PATH,
         "model_loaded": True,
-        "processed_dir": PROCESSED_DIR
+        "processed_dir": PROCESSED_DIR,
     }
 
     # Добавляем информацию о модели, если доступно
-    if hasattr(processor, 'get_model_info'):
+    if hasattr(processor, "get_model_info"):
         info.update(processor.get_model_info())
 
     return info
@@ -113,13 +112,16 @@ async def predict(req: PredictRequest):
         p = Path(PROCESSED_DIR) / p
 
     if not p.exists():
-        logger.error(f"Путь к исследованию не найден: {p} (абсолютный путь: {p.absolute()})")
-        raise HTTPException(status_code=400,
-                            detail=f"Путь к исследованию не найден: {p}. Доступные пути относительно {PROCESSED_DIR}")
-    if not p.is_dir():
+        logger.error(
+            f"Путь к исследованию не найден: {p} (абсолютный путь: {p.absolute()})"
+        )
         raise HTTPException(
             status_code=400,
-            detail=f"Указанный путь не является директорией: {p}"
+            detail=f"Путь к исследованию не найден: {p}. Доступные пути относительно {PROCESSED_DIR}",
+        )
+    if not p.is_dir():
+        raise HTTPException(
+            status_code=400, detail=f"Указанный путь не является директорией: {p}"
         )
 
     try:
@@ -138,18 +140,26 @@ async def predict(req: PredictRequest):
             try:
                 logger.info(f"🔬 Запуск анализа для исследования {study_id}")
                 result = processor.process_study_folder(str(p), study_id)
-                logger.info(f"✅ process_study_folder завершен для исследования {study_id}")
+                logger.info(
+                    f"✅ process_study_folder завершен для исследования {study_id}"
+                )
                 logger.info(f"   📊 Статус: {result.get('processing_status')}")
-                logger.info(f"   📈 Вероятность: {result.get('probability_of_pathology', 0):.3f}")
+                logger.info(
+                    f"   📈 Вероятность: {result.get('probability_of_pathology', 0):.3f}"
+                )
                 logger.info(f"   🏥 Класс: {result.get('pathology_class', 0)}")
 
                 logger.info(f"   🏥 Класс: {result.get('pathology_class', 0)}")
-                if 'heatmap_data' in result:
-                    hd = result['heatmap_data']
+                if "heatmap_data" in result:
+                    hd = result["heatmap_data"]
                     logger.info(f"   🔥 Heatmap: shape={hd.get('error_map_shape')}")
-                    logger.info(f"   📐 Статистика: max={hd.get('heatmap_statistics', {}).get('max_error', 0):.4f}")
+                    logger.info(
+                        f"   📐 Статистика: max={hd.get('heatmap_statistics', {}).get('max_error', 0):.4f}"
+                    )
                 else:
-                    logger.warning("❌ heatmap_data отсутствует в результате process_study_folder")
+                    logger.warning(
+                        "❌ heatmap_data отсутствует в результате process_study_folder"
+                    )
                 logger.info(f"Анализ завершен для исследования {study_id}")
                 return result
             except Exception as e:
@@ -162,14 +172,24 @@ async def predict(req: PredictRequest):
 
         logger.info(f"📦 ML сервис вернул результат для исследования {study_id}")
         logger.info(f"   📊 Статус: {result.get('processing_status')}")
-        logger.info(f"   📈 Вероятность: {result.get('probability_of_pathology', 0):.3f}")
-        if 'heatmap_data' in result:
-            heatmap_data = result['heatmap_data']
+        logger.info(
+            f"   📈 Вероятность: {result.get('probability_of_pathology', 0):.3f}"
+        )
+        if "heatmap_data" in result:
+            heatmap_data = result["heatmap_data"]
             if heatmap_data:
-                logger.info(f"🔥 heatmap_data получен: shape={heatmap_data.get('error_map_shape')}")
-                logger.info(f"📐 error_map_shape: {heatmap_data.get('error_map_shape')}")
-                logger.info(f"📈 heatmap_statistics: {heatmap_data.get('heatmap_statistics', {})}")
-                logger.info(f"🖼️ PNG доступен: {heatmap_data.get('visualization_png') is not None}")
+                logger.info(
+                    f"🔥 heatmap_data получен: shape={heatmap_data.get('error_map_shape')}"
+                )
+                logger.info(
+                    f"📐 error_map_shape: {heatmap_data.get('error_map_shape')}"
+                )
+                logger.info(
+                    f"📈 heatmap_statistics: {heatmap_data.get('heatmap_statistics', {})}"
+                )
+                logger.info(
+                    f"🖼️ PNG доступен: {heatmap_data.get('visualization_png') is not None}"
+                )
             else:
                 logger.warning("❌ heatmap_data присутствует но пустой")
         else:
@@ -177,18 +197,23 @@ async def predict(req: PredictRequest):
 
         if result.get("processing_status") == "Success":
             logger.info(f"✅ Исследование {study_id} успешно обработано")
-            probability = result.get('probability_of_pathology', 0)
-            pathology = result.get('pathology_class', 0)
-            logger.info(f"📈 Вероятность патологии: {probability:.3f}, Класс: {pathology}")
+            probability = result.get("probability_of_pathology", 0)
+            pathology = result.get("pathology_class", 0)
+            logger.info(
+                f"📈 Вероятность патологии: {probability:.3f}, Класс: {pathology}"
+            )
         else:
-            error_msg = result.get('error_message', 'Неизвестная ошибка')
-            logger.warning(f"⚠️ Проблемы при обработке исследования {study_id}: {error_msg}")
+            error_msg = result.get("error_message", "Неизвестная ошибка")
+            logger.warning(
+                f"⚠️ Проблемы при обработке исследования {study_id}: {error_msg}"
+            )
 
         return result
 
     except Exception as e:
-        logger.exception(f"Необработанное исключение при анализе исследования {study_id}")
+        logger.exception(
+            f"Необработанное исключение при анализе исследования {study_id}"
+        )
         raise HTTPException(
-            status_code=500,
-            detail=f"Ошибка анализа исследования {study_id}: {str(e)}"
-            )
+            status_code=500, detail=f"Ошибка анализа исследования {study_id}: {str(e)}"
+        )

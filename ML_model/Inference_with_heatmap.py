@@ -7,41 +7,48 @@ Original file is located at
     https://colab.research.google.com/drive/1zr5eOW5001fXVJh3G8OVzH-imwvHgb8b
 """
 
-import os
-import numpy as np
-import tensorflow as tf
-from pathlib import Path
-import SimpleITK as sitk
-import pydicom
-from scipy.ndimage import zoom
-import json
-import time
-import matplotlib.pyplot as plt
-import io
 import base64
+import io
+import json
+import os
+import time
+from pathlib import Path
+
+import matplotlib.pyplot as plt
+import numpy as np
+import pydicom
+import SimpleITK as sitk
+import tensorflow as tf
 from scipy import ndimage
+from scipy.ndimage import zoom
+
 
 # Кастомная MSE функция для совместимости с обученной моделью
 def custom_mse(y_true, y_pred):
     return tf.reduce_mean(tf.square(y_true - y_pred))
+
 
 class CTInferenceProcessor:
     """
     Класс для обработки КТ-исследований и выполнения инференса.
     Генерирует heatmap в виде numpy array и PNG для визуализации.
     """
+
     def __init__(self, target_size=(128, 128, 64)):
         self.target_size = target_size
         self.model = None
         self.optimal_threshold = 0.01
 
-    def load_model(self, model_path='pathology_autoencoder.keras', threshold_path='pathology_threshold.json'):
+    def load_model(
+        self,
+        model_path="pathology_autoencoder.keras",
+        threshold_path="pathology_threshold.json",
+    ):
         """Загружает модель и порог."""
         try:
             if os.path.exists(model_path):
                 self.model = tf.keras.models.load_model(
-                    model_path,
-                    custom_objects={'custom_mse': custom_mse}
+                    model_path, custom_objects={"custom_mse": custom_mse}
                 )
                 print(f"✓ Модель загружена из {model_path}")
             else:
@@ -49,9 +56,9 @@ class CTInferenceProcessor:
                 return False
 
             if os.path.exists(threshold_path):
-                with open(threshold_path, 'r') as f:
+                with open(threshold_path, "r") as f:
                     threshold_data = json.load(f)
-                self.optimal_threshold = threshold_data['optimal_threshold']
+                self.optimal_threshold = threshold_data["optimal_threshold"]
                 print(f"✓ Порог загружен: {self.optimal_threshold:.6f}")
             else:
                 print("⚠ Файл порога не найден. Использую значение по умолчанию.")
@@ -74,7 +81,7 @@ class CTInferenceProcessor:
         """Загружает серию DICOM файлов из папки."""
         try:
             all_files = list(Path(directory_path).iterdir())
-            files = [f for f in all_files if f.is_file() and not f.name.startswith('.')]
+            files = [f for f in all_files if f.is_file() and not f.name.startswith(".")]
 
             if not files:
                 print(f"❌ Нет файлов в {directory_path}")
@@ -92,10 +99,14 @@ class CTInferenceProcessor:
                 else:
                     non_dicom_files.append(str(file_path))
 
-            print(f"🔍 DICOM файлов: {len(dicom_files)}, не-DICOM: {len(non_dicom_files)}")
+            print(
+                f"🔍 DICOM файлов: {len(dicom_files)}, не-DICOM: {len(non_dicom_files)}"
+            )
 
             if not dicom_files:
-                print("⚠ Не найдено DICOM файлов по сигнатуре, пробуем загрузить все файлы...")
+                print(
+                    "⚠ Не найдено DICOM файлов по сигнатуре, пробуем загрузить все файлы..."
+                )
                 dicom_files = [str(f) for f in files]
 
             dicom_files.sort()
@@ -107,8 +118,12 @@ class CTInferenceProcessor:
                     ds = pydicom.dcmread(first_file, stop_before_pixels=True)
                     print(f"📄 Первый файл: {Path(first_file).name}")
                     print(f"   Modality: {getattr(ds, 'Modality', 'Unknown')}")
-                    print(f"   Size: {getattr(ds, 'Rows', '?')}x{getattr(ds, 'Columns', '?')}")
-                    print(f"   Slice location: {getattr(ds, 'SliceLocation', 'Unknown')}")
+                    print(
+                        f"   Size: {getattr(ds, 'Rows', '?')}x{getattr(ds, 'Columns', '?')}"
+                    )
+                    print(
+                        f"   Slice location: {getattr(ds, 'SliceLocation', 'Unknown')}"
+                    )
                 except Exception as e:
                     print(f"⚠ Ошибка чтения первого файла: {e}")
 
@@ -125,6 +140,7 @@ class CTInferenceProcessor:
         except Exception as e:
             print(f"❌ Ошибка загрузки DICOM из {directory_path}: {e}")
             import traceback
+
             print(f"🔍 Детали ошибки: {traceback.format_exc()}")
             return None
 
@@ -139,7 +155,9 @@ class CTInferenceProcessor:
 
             # СПЕЦИАЛЬНАЯ ОБРАБОТКА ДЛЯ ОДИНОЧНЫХ ФАЙЛОВ vs СЕРИЙ
             if image_array.ndim == 4:
-                print("⚠️ Обнаружены 4D данные (вероятно одиночный файл или multiple series)")
+                print(
+                    "⚠️ Обнаружены 4D данные (вероятно одиночный файл или multiple series)"
+                )
 
                 # Анализируем структуру: (series, slices, height, width) или (1, slices, height, width)
                 if image_array.shape[0] == 1:
@@ -148,13 +166,17 @@ class CTInferenceProcessor:
                     print(f"🔄 Убрана ось series: {image_array.shape}")
                 else:
                     # Случай: (series, slices, height, width) - берем первую серию
-                    print(f"⚠️ Множественные серии ({image_array.shape[0]}), берем первую")
+                    print(
+                        f"⚠️ Множественные серии ({image_array.shape[0]}), берем первую"
+                    )
                     image_array = image_array[0]
                     print(f"🔄 Взята первая серия: {image_array.shape}")
 
             # Убеждаемся, что получили 3D данные
             if image_array.ndim != 3:
-                raise ValueError(f"После преобразования ожидалось 3D, но получилось {image_array.ndim}D")
+                raise ValueError(
+                    f"После преобразования ожидалось 3D, но получилось {image_array.ndim}D"
+                )
 
             print(f"✅ Финальная 3D форма: {image_array.shape}")
 
@@ -166,7 +188,7 @@ class CTInferenceProcessor:
             zoom_factors = [
                 self.target_size[0] / image_array.shape[0],
                 self.target_size[1] / image_array.shape[1],
-                self.target_size[2] / image_array.shape[2]
+                self.target_size[2] / image_array.shape[2],
             ]
 
             print(f"🔍 Zoom factors: {zoom_factors}")
@@ -182,6 +204,7 @@ class CTInferenceProcessor:
         except Exception as e:
             print(f"❌ Ошибка препроцессинга: {e}")
             import traceback
+
             print(f"🔍 Детали ошибки: {traceback.format_exc()}")
             return None
 
@@ -208,7 +231,9 @@ class CTInferenceProcessor:
             print(f"❌ Ошибка предсказания: {e}")
             return None, None, None, None
 
-    def generate_heatmap_visualization(self, original, reconstruction, error_map, slice_index=None):
+    def generate_heatmap_visualization(
+        self, original, reconstruction, error_map, slice_index=None
+    ):
         """Генерирует PNG визуализацию heatmap."""
         try:
             if slice_index is None:
@@ -221,38 +246,56 @@ class CTInferenceProcessor:
             fig, axes = plt.subplots(2, 2, figsize=(12, 10))
 
             # Оригинальное изображение
-            im1 = axes[0, 0].imshow(original[:, :, slice_index], cmap='gray', aspect='auto')
-            axes[0, 0].set_title(f'Оригинал (срез {slice_index})')
-            axes[0, 0].axis('off')
+            im1 = axes[0, 0].imshow(
+                original[:, :, slice_index], cmap="gray", aspect="auto"
+            )
+            axes[0, 0].set_title(f"Оригинал (срез {slice_index})")
+            axes[0, 0].axis("off")
             plt.colorbar(im1, ax=axes[0, 0])
 
             # Реконструкция
-            im2 = axes[0, 1].imshow(reconstruction[:, :, slice_index], cmap='gray', aspect='auto')
-            axes[0, 1].set_title(f'Реконструкция (срез {slice_index})')
-            axes[0, 1].axis('off')
+            im2 = axes[0, 1].imshow(
+                reconstruction[:, :, slice_index], cmap="gray", aspect="auto"
+            )
+            axes[0, 1].set_title(f"Реконструкция (срез {slice_index})")
+            axes[0, 1].axis("off")
             plt.colorbar(im2, ax=axes[0, 1])
 
             # Heatmap ошибок
-            im3 = axes[1, 0].imshow(error_map[:, :, slice_index], cmap='hot', aspect='auto', vmin=0, vmax=np.percentile(error_map, 95))
-            axes[1, 0].set_title(f'Heatmap ошибок (срез {slice_index})')
-            axes[1, 0].axis('off')
+            im3 = axes[1, 0].imshow(
+                error_map[:, :, slice_index],
+                cmap="hot",
+                aspect="auto",
+                vmin=0,
+                vmax=np.percentile(error_map, 95),
+            )
+            axes[1, 0].set_title(f"Heatmap ошибок (срез {slice_index})")
+            axes[1, 0].axis("off")
             plt.colorbar(im3, ax=axes[1, 0])
 
             # Наложение heatmap на оригинал
-            im4 = axes[1, 1].imshow(original[:, :, slice_index], cmap='gray', aspect='auto')
-            im4_overlay = axes[1, 1].imshow(error_map[:, :, slice_index], cmap='hot',
-                                           alpha=0.5, aspect='auto', vmin=0, vmax=np.percentile(error_map, 95))
-            axes[1, 1].set_title(f'Наложение (срез {slice_index})')
-            axes[1, 1].axis('off')
+            im4 = axes[1, 1].imshow(
+                original[:, :, slice_index], cmap="gray", aspect="auto"
+            )
+            im4_overlay = axes[1, 1].imshow(
+                error_map[:, :, slice_index],
+                cmap="hot",
+                alpha=0.5,
+                aspect="auto",
+                vmin=0,
+                vmax=np.percentile(error_map, 95),
+            )
+            axes[1, 1].set_title(f"Наложение (срез {slice_index})")
+            axes[1, 1].axis("off")
             plt.colorbar(im4_overlay, ax=axes[1, 1])
 
             plt.tight_layout()
 
             # Сохраняем в байты
             buf = io.BytesIO()
-            plt.savefig(buf, format='png', dpi=150, bbox_inches='tight')
+            plt.savefig(buf, format="png", dpi=150, bbox_inches="tight")
             buf.seek(0)
-            png_data = base64.b64encode(buf.getvalue()).decode('utf-8')
+            png_data = base64.b64encode(buf.getvalue()).decode("utf-8")
             plt.close()
 
             return png_data
@@ -264,17 +307,19 @@ class CTInferenceProcessor:
     def get_heatmap_statistics(self, error_map):
         """Вычисляет статистику по heatmap."""
         return {
-            'max_error': float(np.max(error_map)),
-            'mean_error': float(np.mean(error_map)),
-            'std_error': float(np.std(error_map)),
-            'percentile_95': float(np.percentile(error_map, 95)),
-            'percentile_99': float(np.percentile(error_map, 99)),
-            'total_error_volume': float(np.sum(error_map))
+            "max_error": float(np.max(error_map)),
+            "mean_error": float(np.mean(error_map)),
+            "std_error": float(np.std(error_map)),
+            "percentile_95": float(np.percentile(error_map, 95)),
+            "percentile_99": float(np.percentile(error_map, 99)),
+            "total_error_volume": float(np.sum(error_map)),
         }
 
     def sigmoid_transform(self, error):
         """Преобразование ошибки в вероятность."""
-        scaled_error = (error - self.optimal_threshold) / max(self.optimal_threshold, 0.001)
+        scaled_error = (error - self.optimal_threshold) / max(
+            self.optimal_threshold, 0.001
+        )
         probability = 1 / (1 + np.exp(-scaled_error * 3))
         return probability
 
@@ -286,22 +331,22 @@ class CTInferenceProcessor:
         start_time = time.time()
 
         result = {
-            'study_folder_path': str(study_folder_path),
-            'study_id': study_id,
-            'probability_of_pathology': 0.0,
-            'pathology_class': 0,
-            'processing_status': "Success",
-            'processing_time_seconds': 0.0,
-            'error_message': "",
-            'reconstruction_error': 0.0,
-            'original_image_size': "",
-            'processed_image_size': "",
-            'heatmap_data': {
-                'error_map_3d': None,  # numpy array для анализа
-                'heatmap_statistics': {},
-                'visualization_png': None,  # base64 PNG для визуализации
-                'max_error_slice_index': 0
-            }
+            "study_folder_path": str(study_folder_path),
+            "study_id": study_id,
+            "probability_of_pathology": 0.0,
+            "pathology_class": 0,
+            "processing_status": "Success",
+            "processing_time_seconds": 0.0,
+            "error_message": "",
+            "reconstruction_error": 0.0,
+            "original_image_size": "",
+            "processed_image_size": "",
+            "heatmap_data": {
+                "error_map_3d": None,  # numpy array для анализа
+                "heatmap_statistics": {},
+                "visualization_png": None,  # base64 PNG для визуализации
+                "max_error_slice_index": 0,
+            },
         }
 
         try:
@@ -314,26 +359,36 @@ class CTInferenceProcessor:
 
             # Сохраняем информацию о исходном размере
             original_size = sitk_image.GetSize()
-            result['original_image_size'] = f"{original_size[0]}x{original_size[1]}x{original_size[2]}"
+            result["original_image_size"] = (
+                f"{original_size[0]}x{original_size[1]}x{original_size[2]}"
+            )
 
             # Препроцессинг
             processed_volume = self.preprocess_image(sitk_image)
             if processed_volume is None:
                 raise Exception("Ошибка препроцессинга изображения")
 
-            result['processed_image_size'] = f"{processed_volume.shape[0]}x{processed_volume.shape[1]}x{processed_volume.shape[2]}"
+            result["processed_image_size"] = (
+                f"{processed_volume.shape[0]}x{processed_volume.shape[1]}x{processed_volume.shape[2]}"
+            )
 
             # Вычисление ошибки реконструкции и heatmap
-            reconstruction_error, error_map_3d, original_3d, reconstruction_3d = self.calculate_reconstruction_error_with_heatmap(processed_volume)
+            reconstruction_error, error_map_3d, original_3d, reconstruction_3d = (
+                self.calculate_reconstruction_error_with_heatmap(processed_volume)
+            )
 
             if reconstruction_error is None:
                 raise Exception("Ошибка вычисления reconstruction error")
 
             # Находим срез с максимальной ошибкой
-            max_error_slice_index = np.argmax(np.max(np.max(error_map_3d, axis=1), axis=1))
+            max_error_slice_index = np.argmax(
+                np.max(np.max(error_map_3d, axis=1), axis=1)
+            )
 
             # Генерируем PNG визуализацию
-            png_visualization = self.generate_heatmap_visualization(original_3d, reconstruction_3d, error_map_3d, max_error_slice_index)
+            png_visualization = self.generate_heatmap_visualization(
+                original_3d, reconstruction_3d, error_map_3d, max_error_slice_index
+            )
 
             # Статистика heatmap
             heatmap_stats = self.get_heatmap_statistics(error_map_3d)
@@ -343,38 +398,50 @@ class CTInferenceProcessor:
             pathology_class = 1 if probability > 0.43 else 0
 
             # Заполняем результат
-            result.update({
-                'probability_of_pathology': float(probability),
-                'pathology_class': pathology_class,
-                'processing_time_seconds': time.time() - start_time,
-                'reconstruction_error': float(reconstruction_error),
-                'heatmap_data': {
-                    'error_map_3d': error_map_3d.tolist(),  # Конвертируем в list для JSON
-                    'heatmap_statistics': heatmap_stats,
-                    'visualization_png': png_visualization,
-                    'max_error_slice_index': int(max_error_slice_index),
-                    'error_map_shape': error_map_3d.shape
+            result.update(
+                {
+                    "probability_of_pathology": float(probability),
+                    "pathology_class": pathology_class,
+                    "processing_time_seconds": time.time() - start_time,
+                    "reconstruction_error": float(reconstruction_error),
+                    "heatmap_data": {
+                        "error_map_3d": error_map_3d.tolist(),  # Конвертируем в list для JSON
+                        "heatmap_statistics": heatmap_stats,
+                        "visualization_png": png_visualization,
+                        "max_error_slice_index": int(max_error_slice_index),
+                        "error_map_shape": error_map_3d.shape,
+                    },
                 }
-            })
+            )
 
-            print(f"📊 Результат: Ошибка={reconstruction_error:.6f}, "
-                  f"Вероятность={probability:.3f}, Класс={'Патология' if pathology_class else 'Норма'}")
-            print(f"🔥 Heatmap статистика: max={heatmap_stats['max_error']:.4f}, "
-                  f"mean={heatmap_stats['mean_error']:.4f}")
+            print(
+                f"📊 Результат: Ошибка={reconstruction_error:.6f}, "
+                f"Вероятность={probability:.3f}, Класс={'Патология' if pathology_class else 'Норма'}"
+            )
+            print(
+                f"🔥 Heatmap статистика: max={heatmap_stats['max_error']:.4f}, "
+                f"mean={heatmap_stats['mean_error']:.4f}"
+            )
 
         except Exception as e:
             error_msg = str(e)
-            result.update({
-                'processing_status': "Failure",
-                'error_message': error_msg,
-                'processing_time_seconds': time.time() - start_time
-            })
+            result.update(
+                {
+                    "processing_status": "Failure",
+                    "error_message": error_msg,
+                    "processing_time_seconds": time.time() - start_time,
+                }
+            )
             print(f"❌ Ошибка обработки: {error_msg}")
 
         return result
 
-def process_ct_studies(study_folders, model_path='pathology_autoencoder.keras',
-                      threshold_path='pathology_threshold.json'):
+
+def process_ct_studies(
+    study_folders,
+    model_path="pathology_autoencoder.keras",
+    threshold_path="pathology_threshold.json",
+):
     """
     Основная функция для вызова из бэкенда.
 
@@ -397,9 +464,9 @@ def process_ct_studies(study_folders, model_path='pathology_autoencoder.keras',
     # Загрузка модели
     if not processor.load_model(model_path, threshold_path):
         return {
-            'overall_status': 'Error',
-            'error_message': 'Не удалось загрузить модель',
-            'processed_studies': []
+            "overall_status": "Error",
+            "error_message": "Не удалось загрузить модель",
+            "processed_studies": [],
         }
 
     # Обработка каждой папки с исследованием
@@ -414,21 +481,21 @@ def process_ct_studies(study_folders, model_path='pathology_autoencoder.keras',
         results.append(result)
 
     # Формируем итоговый отчет
-    successful = len([r for r in results if r['processing_status'] == "Success"])
-    failed = len([r for r in results if r['processing_status'] == "Failure"])
-    pathology_count = len([r for r in results if r.get('pathology_class', 0) == 1])
+    successful = len([r for r in results if r["processing_status"] == "Success"])
+    failed = len([r for r in results if r["processing_status"] == "Failure"])
+    pathology_count = len([r for r in results if r.get("pathology_class", 0) == 1])
 
     final_result = {
-        'overall_status': 'Completed',
-        'total_studies_processed': len(results),
-        'successful_processing': successful,
-        'failed_processing': failed,
-        'pathology_cases': pathology_count,
-        'normal_cases': len(results) - pathology_count,
-        'processing_timestamp': time.strftime("%Y-%m-%d %H:%M:%S"),
-        'model_used': model_path,
-        'threshold_used': threshold_path,
-        'processed_studies': results
+        "overall_status": "Completed",
+        "total_studies_processed": len(results),
+        "successful_processing": successful,
+        "failed_processing": failed,
+        "pathology_cases": pathology_count,
+        "normal_cases": len(results) - pathology_count,
+        "processing_timestamp": time.strftime("%Y-%m-%d %H:%M:%S"),
+        "model_used": model_path,
+        "threshold_used": threshold_path,
+        "processed_studies": results,
     }
 
     print(f"\n📈 Итоговая статистика:")
@@ -440,6 +507,7 @@ def process_ct_studies(study_folders, model_path='pathology_autoencoder.keras',
 
     return final_result
 
+
 # Пример использования для тестирования
 if __name__ == "__main__":
     # Тестовые данные
@@ -450,14 +518,18 @@ if __name__ == "__main__":
 
     results_dict = process_ct_studies(
         study_folders=test_folders,
-        model_path='pathology_autoencoder.keras',
-        threshold_path='pathology_threshold.json'
+        model_path="pathology_autoencoder.keras",
+        threshold_path="pathology_threshold.json",
     )
 
     # Пример доступа к heatmap данным
-    for study in results_dict['processed_studies']:
-        if study['processing_status'] == 'Success':
+    for study in results_dict["processed_studies"]:
+        if study["processing_status"] == "Success":
             print(f"\n📊 Исследование: {study['study_id']}")
             print(f"Heatmap shape: {study['heatmap_data']['error_map_shape']}")
-            print(f"Max error: {study['heatmap_data']['heatmap_statistics']['max_error']:.6f}")
-            print(f"PNG visualization available: {study['heatmap_data']['visualization_png'] is not None}")
+            print(
+                f"Max error: {study['heatmap_data']['heatmap_statistics']['max_error']:.6f}"
+            )
+            print(
+                f"PNG visualization available: {study['heatmap_data']['visualization_png'] is not None}"
+            )

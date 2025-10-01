@@ -7,37 +7,44 @@ Original file is located at
     https://colab.research.google.com/drive/1zr5eOW5001fXVJh3G8OVzH-imwvHgb8b
 """
 
-import os
-import numpy as np
-import tensorflow as tf
-from pathlib import Path
-import SimpleITK as sitk
-import pydicom
-from scipy.ndimage import zoom
 import json
+import os
 import time
+from pathlib import Path
+
+import numpy as np
+import pydicom
+import SimpleITK as sitk
+import tensorflow as tf
+from scipy.ndimage import zoom
+
 
 # Кастомная MSE функция для совместимости с обученной моделью
 def custom_mse(y_true, y_pred):
     return tf.reduce_mean(tf.square(y_true - y_pred))
+
 
 class CTInferenceProcessor:
     """
     Класс для обработки КТ-исследований и выполнения инференса.
     Принимает готовую папку с DICOM файлами, возвращает dict с результатами.
     """
+
     def __init__(self, target_size=(128, 128, 64)):
         self.target_size = target_size
         self.model = None
         self.optimal_threshold = 0.01
 
-    def load_model(self, model_path='pathology_autoencoder.keras', threshold_path='pathology_threshold.json'):
+    def load_model(
+        self,
+        model_path="pathology_autoencoder.keras",
+        threshold_path="pathology_threshold.json",
+    ):
         """Загружает модель и порог."""
         try:
             if os.path.exists(model_path):
                 self.model = tf.keras.models.load_model(
-                    model_path,
-                    custom_objects={'custom_mse': custom_mse}
+                    model_path, custom_objects={"custom_mse": custom_mse}
                 )
                 print(f"✓ Модель загружена из {model_path}")
             else:
@@ -45,9 +52,9 @@ class CTInferenceProcessor:
                 return False
 
             if os.path.exists(threshold_path):
-                with open(threshold_path, 'r') as f:
+                with open(threshold_path, "r") as f:
                     threshold_data = json.load(f)
-                self.optimal_threshold = threshold_data['optimal_threshold']
+                self.optimal_threshold = threshold_data["optimal_threshold"]
                 print(f"✓ Порог загружен: {self.optimal_threshold:.6f}")
             else:
                 print("⚠ Файл порога не найден. Использую значение по умолчанию.")
@@ -71,7 +78,7 @@ class CTInferenceProcessor:
         try:
             # Получаем все файлы в папке
             all_files = list(Path(directory_path).iterdir())
-            files = [f for f in all_files if f.is_file() and not f.name.startswith('.')]
+            files = [f for f in all_files if f.is_file() and not f.name.startswith(".")]
 
             if not files:
                 print(f"❌ Нет файлов в {directory_path}")
@@ -86,7 +93,9 @@ class CTInferenceProcessor:
                     dicom_files.append(str(file_path))
 
             if not dicom_files:
-                print("⚠ Не найдено DICOM файлов по сигнатуре, пробуем загрузить все файлы...")
+                print(
+                    "⚠ Не найдено DICOM файлов по сигнатуре, пробуем загрузить все файлы..."
+                )
                 dicom_files = [str(f) for f in files]
 
             print(f"🔍 Загружаем {len(dicom_files)} файлов как DICOM")
@@ -125,7 +134,7 @@ class CTInferenceProcessor:
             zoom_factors = [
                 self.target_size[0] / image_array.shape[0],
                 self.target_size[1] / image_array.shape[1],
-                self.target_size[2] / image_array.shape[2]
+                self.target_size[2] / image_array.shape[2],
             ]
             image_array_resized = zoom(image_array, zoom_factors, order=1)
 
@@ -152,7 +161,9 @@ class CTInferenceProcessor:
 
     def sigmoid_transform(self, error):
         """Преобразование ошибки в вероятность."""
-        scaled_error = (error - self.optimal_threshold) / max(self.optimal_threshold, 0.001)
+        scaled_error = (error - self.optimal_threshold) / max(
+            self.optimal_threshold, 0.001
+        )
         probability = 1 / (1 + np.exp(-scaled_error * 3))
         return probability
 
@@ -164,16 +175,16 @@ class CTInferenceProcessor:
         start_time = time.time()
 
         result = {
-            'study_folder_path': str(study_folder_path),
-            'study_id': study_id,
-            'probability_of_pathology': 0.0,
-            'pathology_class': 0,
-            'processing_status': "Success",
-            'processing_time_seconds': 0.0,
-            'error_message': "",
-            'reconstruction_error': 0.0,
-            'original_image_size': "",
-            'processed_image_size': ""
+            "study_folder_path": str(study_folder_path),
+            "study_id": study_id,
+            "probability_of_pathology": 0.0,
+            "pathology_class": 0,
+            "processing_status": "Success",
+            "processing_time_seconds": 0.0,
+            "error_message": "",
+            "reconstruction_error": 0.0,
+            "original_image_size": "",
+            "processed_image_size": "",
         }
 
         try:
@@ -186,7 +197,9 @@ class CTInferenceProcessor:
 
             # Сохраняем информацию о исходном размере
             original_size = sitk_image.GetSize()
-            result['original_image_size'] = f"{original_size[0]}x{original_size[1]}x{original_size[2]}"
+            result["original_image_size"] = (
+                f"{original_size[0]}x{original_size[1]}x{original_size[2]}"
+            )
 
             # Препроцессинг
             processed_volume = self.preprocess_image(sitk_image)
@@ -194,7 +207,9 @@ class CTInferenceProcessor:
                 raise Exception("Ошибка препроцессинга изображения")
 
             # Сохраняем информацию о обработанном размере
-            result['processed_image_size'] = f"{processed_volume.shape[0]}x{processed_volume.shape[1]}x{processed_volume.shape[2]}"
+            result["processed_image_size"] = (
+                f"{processed_volume.shape[0]}x{processed_volume.shape[1]}x{processed_volume.shape[2]}"
+            )
 
             # Вычисление ошибки реконструкции
             reconstruction_error = self.calculate_reconstruction_error(processed_volume)
@@ -206,29 +221,39 @@ class CTInferenceProcessor:
             pathology_class = 1 if reconstruction_error > self.optimal_threshold else 0
 
             # Заполняем результат
-            result.update({
-                'probability_of_pathology': float(probability),
-                'pathology_class': pathology_class,
-                'processing_time_seconds': time.time() - start_time,
-                'reconstruction_error': float(reconstruction_error)
-            })
+            result.update(
+                {
+                    "probability_of_pathology": float(probability),
+                    "pathology_class": pathology_class,
+                    "processing_time_seconds": time.time() - start_time,
+                    "reconstruction_error": float(reconstruction_error),
+                }
+            )
 
-            print(f"📊 Результат: Ошибка={reconstruction_error:.6f}, "
-                  f"Вероятность={probability:.3f}, Класс={'Патология' if pathology_class else 'Норма'}")
+            print(
+                f"📊 Результат: Ошибка={reconstruction_error:.6f}, "
+                f"Вероятность={probability:.3f}, Класс={'Патология' if pathology_class else 'Норма'}"
+            )
 
         except Exception as e:
             error_msg = str(e)
-            result.update({
-                'processing_status': "Failure",
-                'error_message': error_msg,
-                'processing_time_seconds': time.time() - start_time
-            })
+            result.update(
+                {
+                    "processing_status": "Failure",
+                    "error_message": error_msg,
+                    "processing_time_seconds": time.time() - start_time,
+                }
+            )
             print(f"❌ Ошибка обработки: {error_msg}")
 
         return result
 
-def process_ct_studies(study_folders, model_path='pathology_autoencoder.keras',
-                      threshold_path='pathology_threshold.json'):
+
+def process_ct_studies(
+    study_folders,
+    model_path="pathology_autoencoder.keras",
+    threshold_path="pathology_threshold.json",
+):
     """
     Основная функция для вызова из бэкенда.
 
@@ -251,9 +276,9 @@ def process_ct_studies(study_folders, model_path='pathology_autoencoder.keras',
     # Загрузка модели
     if not processor.load_model(model_path, threshold_path):
         return {
-            'overall_status': 'Error',
-            'error_message': 'Не удалось загрузить модель',
-            'processed_studies': []
+            "overall_status": "Error",
+            "error_message": "Не удалось загрузить модель",
+            "processed_studies": [],
         }
 
     # Обработка каждой папки с исследованием
@@ -269,20 +294,20 @@ def process_ct_studies(study_folders, model_path='pathology_autoencoder.keras',
         results.append(result)
 
     # Формируем итоговый отчет
-    successful = len([r for r in results if r['processing_status'] == "Success"])
-    failed = len([r for r in results if r['processing_status'] == "Failure"])
-    pathology_count = len([r for r in results if r.get('pathology_class', 0) == 1])
-    normal_count = len([r for r in results if r.get('pathology_class', 0) == 0])
+    successful = len([r for r in results if r["processing_status"] == "Success"])
+    failed = len([r for r in results if r["processing_status"] == "Failure"])
+    pathology_count = len([r for r in results if r.get("pathology_class", 0) == 1])
+    normal_count = len([r for r in results if r.get("pathology_class", 0) == 0])
 
     final_result = {
-        'overall_status': 'Completed',
-        'total_studies_processed': len(results),
-        'successful_processing': successful,
-        'failed_processing': failed,
-        'pathology_cases': pathology_count,
-        'normal_cases': normal_count,
-        'processing_timestamp': time.strftime("%Y-%m-%d %H:%M:%S"),
-        'processed_studies': results
+        "overall_status": "Completed",
+        "total_studies_processed": len(results),
+        "successful_processing": successful,
+        "failed_processing": failed,
+        "pathology_cases": pathology_count,
+        "normal_cases": normal_count,
+        "processing_timestamp": time.strftime("%Y-%m-%d %H:%M:%S"),
+        "processed_studies": results,
     }
 
     print(f"\n📈 Итоговая статистика:")
@@ -293,6 +318,7 @@ def process_ct_studies(study_folders, model_path='pathology_autoencoder.keras',
     print(f"   Патология: {pathology_count}")
 
     return final_result
+
 
 # Пример использования для тестирования
 if __name__ == "__main__":
@@ -306,8 +332,8 @@ if __name__ == "__main__":
     # Замените на реальные пути
     results_dict = process_ct_studies(
         study_folders=test_folders,
-        model_path='pathology_autoencoder.keras',
-        threshold_path='pathology_threshold.json'
+        model_path="pathology_autoencoder.keras",
+        threshold_path="pathology_threshold.json",
     )
 
     # Бэкенд получит results_dict и сам займется выгрузкой в Excel

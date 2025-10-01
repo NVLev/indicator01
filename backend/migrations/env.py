@@ -1,21 +1,20 @@
 from logging.config import fileConfig
+
 from dotenv import load_dotenv
 
 load_dotenv()
-from sqlalchemy import engine_from_config
-from sqlalchemy import pool
-from sqlalchemy.ext.asyncio import async_engine_from_config
-from alembic import context
-import sys
 import os
+import sys
+
+from alembic import context
+from sqlalchemy import engine_from_config, pool
+from sqlalchemy.ext.asyncio import async_engine_from_config
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from app.core.models import Base, User, RefreshToken, Study
-from app.core.config import settings
 import asyncio
 
-
-
+from app.core.config import settings
+from app.core.models import Base, RefreshToken, Study, User
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.
@@ -32,12 +31,15 @@ if config.config_file_name is not None:
 # target_metadata = mymodel.Base.metadata
 target_metadata = Base.metadata
 print("Alembic sees tables:", target_metadata.tables.keys())
+
+
 # other values from the config, defined by the needs of env.py,
 # can be acquired:
 # my_important_option = config.get_main_option("my_important_option")
 # ... etc.
 def get_database_url():
     return settings.db.url
+
 
 def run_migrations_offline():
     """Оффлайн режим — без подключения к БД"""
@@ -52,16 +54,16 @@ def run_migrations_offline():
     with context.begin_transaction():
         context.run_migrations()
 
+
 def do_run_migrations(connection):
     """Выполняет миграции, используя подключение"""
     context.configure(
-        connection=connection,
-        target_metadata=target_metadata,
-        compare_type=True
+        connection=connection, target_metadata=target_metadata, compare_type=True
     )
 
     with context.begin_transaction():
         context.run_migrations()
+
 
 async def run_migrations_online():
     """Онлайн режим — подключение к БД через async engine"""
@@ -69,8 +71,7 @@ async def run_migrations_online():
         {
             **config.get_section(config.config_ini_section),
             "sqlalchemy.url": get_database_url(),
-        }
-        ,
+        },
         prefix="sqlalchemy.",
         poolclass=pool.NullPool,
     )
@@ -81,9 +82,9 @@ async def run_migrations_online():
     await connectable.dispose()
 
 
-
 if context.is_offline_mode():
     run_migrations_offline()
 else:
     import asyncio
+
     asyncio.run(run_migrations_online())
