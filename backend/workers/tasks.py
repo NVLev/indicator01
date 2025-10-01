@@ -1,15 +1,18 @@
-import time
 import os
-from typing import Dict, Any
-from celery import Celery
-from celery.utils.log import get_task_logger
+import time
+from pathlib import Path
+from typing import Any, Dict
+
 
 from app.core.config import settings
 from app.core.models import StudyStatus
 from app.services.study_service import _process_dicom_study_sync
+from celery import Celery
+from celery.utils.log import get_task_logger
+
 from .ml_inference import get_ml_service
+from .sync_db import update_study_results_sync, update_study_status_sync
 from .verification_engine import verification_engine
-from .sync_db import update_study_status_sync, update_study_results_sync
 
 logger = get_task_logger(__name__)
 
@@ -38,12 +41,23 @@ celery_app.conf.update(
     result_expires=3600,
 )
 
+
 @celery_app.task(bind=True, name="process_complete_study_task")
-def process_complete_study_task(self, zip_file_path: str, study_id: int, output_dir: str = "processed_studies") -> Dict[str, Any]:
+def process_complete_study_task(
+    self, zip_file_path: str, study_id: int, output_dir: str = "processed_studies"
+) -> Dict[str, Any]:
     """
     Полный пайплайн обработки исследования: DICOM + ML анализ
     """
     from celery.exceptions import SoftTimeLimitExceeded
+
+    if not check_disk_space_before_processing():
+        error_msg = "Недостаточно места на диске для обработки. Запущена очистка, попробуйте позже."
+        logger.error(f"❌ {error_msg} для исследования {study_id}")
+        update_study_status_sync(study_id, "failed", error_msg)
+        raise Exception(error_msg)
+
+    logger.info(f"🚀 Запуск полной обработки исследования {study_id}")
 
     logger.info(f"🚀 Запуск полной обработки исследования {study_id}")
     start_time = time.time()
@@ -69,11 +83,14 @@ def process_complete_study_task(self, zip_file_path: str, study_id: int, output_
     }
 
     try:
+
         def _check_time_and_update_progress(percent: int, status: str):
             """Проверка времени и обновление прогресса"""
             elapsed = time.time() - start_time
             if elapsed > 9 * 60:
-                raise TimeoutError(f"Превышен лимит времени! Прошло: {elapsed / 60:.1f} мин")
+                raise TimeoutError(
+                    f"Превышен лимит времени! Прошло: {elapsed / 60:.1f} мин"
+                )
 
             self.update_state(
                 state="PROGRESS",
@@ -82,8 +99,8 @@ def process_complete_study_task(self, zip_file_path: str, study_id: int, output_
                     "total": 100,
                     "status": status,
                     "elapsed_time": elapsed,
-                    "time_remaining": max(0, 10 * 60 - elapsed)
-                }
+                    "time_remaining": max(0, 10 * 60 - elapsed),
+                },
             )
             return elapsed
 
@@ -96,7 +113,7 @@ def process_complete_study_task(self, zip_file_path: str, study_id: int, output_
             zip_file_path=zip_file_path,
             study_id=study_id,
             output_dir=output_dir,
-            processing_result=processing_result
+            processing_result=processing_result,
         )
 
         dicom_time = _check_time_and_update_progress(50, "Обработка DICOM завершена")
@@ -105,34 +122,45 @@ def process_complete_study_task(self, zip_file_path: str, study_id: int, output_
         study_metadata = processing_result.get("study_metadata", {})
         study_structure = study_metadata.get("study_structure", {})
 
-        logger.info(f"   Study UID: {study_metadata.get('PrimaryStudyInstanceUID', 'N/A')}")
-        logger.info(f"   Series UID: {study_metadata.get('PrimarySeriesInstanceUID', 'N/A')}")
         logger.info(
-            f"   Структура исследования: {study_structure.get('total_studies', 1)} studies, {study_structure.get('total_series', 1)} series")
-        logger.info(f"   Файлов обработано: {processing_result.get('total_instances', 0)}")
+            f"   Study UID: {study_metadata.get('PrimaryStudyInstanceUID', 'N/A')}"
+        )
+        logger.info(
+            f"   Series UID: {study_metadata.get('PrimarySeriesInstanceUID', 'N/A')}"
+        )
+        logger.info(
+            f"   Структура исследования: {study_structure.get('total_studies', 1)} studies, {study_structure.get('total_series', 1)} series"
+        )
+        logger.info(
+            f"   Файлов обработано: {processing_result.get('total_instances', 0)}"
+        )
         logger.info(f"   Серий обнаружено: {processing_result.get('series_count', 0)}")
 
         # Логируем все Study UID если их несколько
-        if study_structure.get('is_multi_study', False):
-            study_uids = study_structure.get('study_uids', [])
+        if study_structure.get("is_multi_study", False):
+            study_uids = study_structure.get("study_uids", [])
             logger.info(f"   Обнаружено несколько Study UID: {study_uids}")
         # === ЭТАП 2: ML АНАЛИЗ ===
         update_study_status_sync(study_id, "processing_ml")
         _check_time_and_update_progress(60, "Запуск ИИ анализа")
 
         # ML инференс
-        ml_results = _run_ml_inference_fast(processing_result["organized_path"], study_id)
+        ml_results = _run_ml_inference_fast(
+            processing_result["organized_path"], study_id
+        )
         processing_result.update(ml_results)
 
         ml_time = _check_time_and_update_progress(90, "ИИ анализ завершен")
         processing_result["ml_inference_time"] = ml_time - dicom_time
         logger.info(f"📊 Итоговые результаты исследования {study_id}:")
         logger.info(f"   Статус: {processing_result.get('processing_status')}")
-        logger.info(f"   Вероятность патологии: {processing_result.get('probability_of_pathology')}")
+        logger.info(
+            f"   Вероятность патологии: {processing_result.get('probability_of_pathology')}"
+        )
         logger.info(f"   Класс: {processing_result.get('pathology')}")
         logger.info(f"   Heatmap присутствует: {'heatmap_data' in processing_result}")
-        if 'heatmap_data' in processing_result:
-            hd = processing_result['heatmap_data']
+        if "heatmap_data" in processing_result:
+            hd = processing_result["heatmap_data"]
             logger.info(f"   Heatmap shape: {hd.get('error_map_shape')}")
 
         # === ЭТАП 3: ФИНАЛИЗАЦИЯ ===
@@ -149,23 +177,27 @@ def process_complete_study_task(self, zip_file_path: str, study_id: int, output_
                 "total": 100,
                 "status": "Обработка завершена успешно",
                 "elapsed_time": total_time,
-                "within_limit": total_time <= 10 * 60
-            }
+                "within_limit": total_time <= 10 * 60,
+            },
         )
         logger.info(f"Статус исследования {study_id} обновлен в БД")
         return processing_result
 
     except SoftTimeLimitExceeded:
         elapsed = time.time() - start_time
-        error_msg = f"Превышен мягкий лимит времени (9 мин). Затрачено: {elapsed / 60:.1f} мин"
+        error_msg = (
+            f"Превышен мягкий лимит времени (9 мин). Затрачено: {elapsed / 60:.1f} мин"
+        )
         logger.error(f"{error_msg}")
 
-        processing_result.update({
-            "processing_status": "failed",
-            "error_message": error_msg,
-            "processing_time": elapsed,
-            "time_limit_exceeded": True
-        })
+        processing_result.update(
+            {
+                "processing_status": "failed",
+                "error_message": error_msg,
+                "processing_time": elapsed,
+                "time_limit_exceeded": True,
+            }
+        )
 
         update_study_status_sync(study_id, "failed", error_msg)
         raise
@@ -174,25 +206,31 @@ def process_complete_study_task(self, zip_file_path: str, study_id: int, output_
         elapsed = time.time() - start_time
         logger.error(f"Таймаут обработки исследования {study_id}: {e}")
 
-        processing_result.update({
-            "processing_status": "failed",
-            "error_message": str(e),
-            "processing_time": elapsed,
-            "time_limit_exceeded": True
-        })
+        processing_result.update(
+            {
+                "processing_status": "failed",
+                "error_message": str(e),
+                "processing_time": elapsed,
+                "time_limit_exceeded": True,
+            }
+        )
 
         update_study_status_sync(study_id, "failed", str(e))
         raise
 
     except Exception as e:
         elapsed = time.time() - start_time
-        logger.exception(f"Ошибка обработки исследования {study_id} после {elapsed:.1f} сек: {e}")
+        logger.exception(
+            f"Ошибка обработки исследования {study_id} после {elapsed:.1f} сек: {e}"
+        )
 
-        processing_result.update({
-            "processing_status": "failed",
-            "error_message": str(e),
-            "processing_time": elapsed
-        })
+        processing_result.update(
+            {
+                "processing_status": "failed",
+                "error_message": str(e),
+                "processing_time": elapsed,
+            }
+        )
 
         update_study_status_sync(study_id, "failed", str(e))
         raise
@@ -212,23 +250,37 @@ def _run_ml_inference_fast(organized_path: str, study_id: int) -> Dict:
         # ДИАГНОСТИКА: какие поля действительно возвращает ML сервис
         logger.info(f"🔍 ML сервис вернул ключи: {list(ml_results.keys())}")
         logger.info(f"🔍 pathology присутствует: {'pathology' in ml_results}")
-        logger.info(f"🔍 pathology_class присутствует: {'pathology_class' in ml_results}")
+        logger.info(
+            f"🔍 pathology_class присутствует: {'pathology_class' in ml_results}"
+        )
         logger.info(f"📊 Результаты ML для исследования {study_id}:")
         logger.info(f"   Статус: {ml_results.get('processing_status')}")
-        logger.info(f"   Вероятность патологии: {ml_results.get('probability_of_pathology')}")
+        logger.info(
+            f"   Вероятность патологии: {ml_results.get('probability_of_pathology')}"
+        )
         logger.info(f"   Класс: {ml_results.get('pathology')}")
-        has_heatmap = any(key.startswith('heatmap') for key in ml_results.keys())
+        has_heatmap = any(key.startswith("heatmap") for key in ml_results.keys())
         logger.info(f"   Heatmap поля присутствуют: {has_heatmap}")
 
         heatmap_data = ml_results.get("heatmap_data", {})
-        heatmap_statistics = ml_results.get("heatmap_statistics", heatmap_data.get("heatmap_statistics", {}))
-        max_error_slice_index = ml_results.get("max_error_slice_index", heatmap_data.get("max_error_slice_index", 0))
-        heatmap_shape = ml_results.get("heatmap_shape", heatmap_data.get("error_map_shape", [128, 128, 64]))
+        heatmap_statistics = ml_results.get(
+            "heatmap_statistics", heatmap_data.get("heatmap_statistics", {})
+        )
+        max_error_slice_index = ml_results.get(
+            "max_error_slice_index", heatmap_data.get("max_error_slice_index", 0)
+        )
+        heatmap_shape = ml_results.get(
+            "heatmap_shape", heatmap_data.get("error_map_shape", [128, 128, 64])
+        )
 
         if heatmap_data:
             logger.info(f"   Heatmap shape: {heatmap_data.get('error_map_shape')}")
-            logger.info(f"   Heatmap statistics: {heatmap_data.get('heatmap_statistics', {})}")
-            logger.info(f"   PNG визуализация доступна: {heatmap_data.get('visualization_png') is not None}")
+            logger.info(
+                f"   Heatmap statistics: {heatmap_data.get('heatmap_statistics', {})}"
+            )
+            logger.info(
+                f"   PNG визуализация доступна: {heatmap_data.get('visualization_png') is not None}"
+            )
         else:
             logger.warning("⚠️ heatmap_data отсутствует в результатах ML")
 
@@ -250,7 +302,7 @@ def _run_ml_inference_fast(organized_path: str, study_id: int) -> Dict:
                 "statistics": heatmap_statistics,
                 "max_slice": max_error_slice_index,
                 "shape": heatmap_shape,
-                "verification": None
+                "verification": None,
             },
             "heatmap_data": heatmap_data,  # Всегда dict, даже если пустой
             "processing_status": "completed",
@@ -272,16 +324,22 @@ def _run_ml_inference_fast(organized_path: str, study_id: int) -> Dict:
                 if not verification_results.get("достоверно", True):
                     base_result["processing_status"] = "needs_review"
                     base_result["needs_review"] = True
-                    base_result["verification_warnings"] = verification_results.get("предупреждения", [])
+                    base_result["verification_warnings"] = verification_results.get(
+                        "предупреждения", []
+                    )
 
             except Exception as verification_error:
-                logger.warning(f"Ошибка верификации для исследования {study_id}: {verification_error}")
+                logger.warning(
+                    f"Ошибка верификации для исследования {study_id}: {verification_error}"
+                )
                 base_result["verification_error"] = str(verification_error)
 
         # Локализация патологии из heatmap
-        if (ml_results.get("pathology", 0) == 1 and
-                heatmap_statistics and
-                heatmap_statistics.get("max_error", 0) > 0.1):
+        if (
+            ml_results.get("pathology", 0) == 1
+            and heatmap_statistics
+            and heatmap_statistics.get("max_error", 0) > 0.1
+        ):
 
             try:
                 base_result["pathology_localization_coords"] = {
@@ -291,9 +349,11 @@ def _run_ml_inference_fast(organized_path: str, study_id: int) -> Dict:
                     "y_max": float(heatmap_shape[1] if len(heatmap_shape) > 1 else 128),
                     "z_min": float(max_error_slice_index),
                     "z_max": float(max_error_slice_index + 1),
-                    "confidence": heatmap_statistics.get("max_error", 0.0)
+                    "confidence": heatmap_statistics.get("max_error", 0.0),
                 }
-                logger.info(f"📍 Локализация патологии установлена для среза {max_error_slice_index}")
+                logger.info(
+                    f"📍 Локализация патологии установлена для среза {max_error_slice_index}"
+                )
             except Exception as loc_error:
                 logger.warning(f"Ошибка установки локализации: {loc_error}")
 
@@ -302,7 +362,8 @@ def _run_ml_inference_fast(organized_path: str, study_id: int) -> Dict:
         logger.info(f"   Статус: {base_result['processing_status']}")
         logger.info(f"   Heatmap_data тип: {type(base_result['heatmap_data'])}")
         logger.info(
-            f"   Heatmap_data ключи: {list(base_result['heatmap_data'].keys()) if base_result['heatmap_data'] else 'пусто'}")
+            f"   Heatmap_data ключи: {list(base_result['heatmap_data'].keys()) if base_result['heatmap_data'] else 'пусто'}"
+        )
         logger.info(f"   Нужна проверка: {base_result['needs_review']}")
 
         return base_result
@@ -314,54 +375,150 @@ def _run_ml_inference_fast(organized_path: str, study_id: int) -> Dict:
             "most_dangerous_pathology_type": "",  # ✅ Always return empty string on error
             "processing_status": "failed",
             "error_message": str(e),
-            "heatmap_data": {}
+            "heatmap_data": {},
         }
 
+
 @celery_app.task(name="cleanup_old_files_task")
-def cleanup_old_files_task(days_old: int = 7):
+def cleanup_old_files_task(days_old: int = 1, emergency_cleanup: bool = False):
     """
-    Периодическая задача для очистки старых обработанных файлов
+    Умная очистка файлов:
+    - При обычном запуске: удаляет файлы старше 1 дня
+    - При нехватке места: экстренная очистка
     """
     import os
     import shutil
     from datetime import datetime, timedelta
     from pathlib import Path
 
-    logger.info(f"Запуск очистки файлов старше {days_old} дней")
+    # Проверяем свободное место
+    disk_usage = shutil.disk_usage("/")
+    free_gb = disk_usage.free / (1024 ** 3)
+    total_gb = disk_usage.total / (1024 ** 3)
+    usage_percent = (1 - free_gb / total_gb) * 100
+
+    logger.info(f"💾 Статус диска: {usage_percent:.1f}% занято, свободно {free_gb:.1f} GB")
+
+    # АВТОМАТИЧЕСКАЯ ОЧИСТКА ПРИ МАЛОМ МЕСТЕ
+    if free_gb < 5:  # Меньше 5GB свободно - экстренная очистка
+        logger.warning(f"🚨 МАЛО МЕСТА! Свободно всего {free_gb:.1f} GB. Запуск экстренной очистки!")
+        days_old = 0  # Удаляем ВСЕ файлы независимо от возраста
+        emergency_cleanup = True
 
     try:
         cutoff_date = datetime.now() - timedelta(days=days_old)
-        processed_dir = Path("processed_studies")
+        processed_dirs = [
+            Path("processed_studies"),
+            Path("/app/backend/uploads"),
+        ]
 
-        if not processed_dir.exists():
-            logger.info("Директория processed_studies не найдена - очистка не требуется")
-            return {"cleaned_directories": 0}
+        total_cleaned = 0
+        total_freed_space = 0
 
-        cleaned_count = 0
-        for study_dir in processed_dir.iterdir():
-            if study_dir.is_dir():
-                mod_time = datetime.fromtimestamp(study_dir.stat().st_mtime)
-                if mod_time < cutoff_date:
-                    try:
-                        shutil.rmtree(study_dir)
-                        cleaned_count += 1
-                        logger.info(f"Очищена старая директория: {study_dir.name}")
-                    except Exception as e:
-                        logger.warning(f"Не удалось очистить {study_dir.name}: {e}")
+        for base_dir in processed_dirs:
+            if not base_dir.exists():
+                continue
 
-        logger.info(f"Очистка завершена. Удалено директорий: {cleaned_count}")
-        return {"cleaned_directories": cleaned_count, "days_old": days_old}
+            # Сортируем по времени модификации (старые сначала)
+            items = []
+            for item in base_dir.iterdir():
+                try:
+                    mod_time = datetime.fromtimestamp(item.stat().st_mtime)
+                    items.append((item, mod_time))
+                except:
+                    continue
+
+            # Сортируем: старые файлы первыми для удаления
+            items.sort(key=lambda x: x[1])
+
+            for item, mod_time in items:
+                try:
+                    # В экстренном режиме удаляем ВСЕ, иначе только старые
+                    if emergency_cleanup or mod_time < cutoff_date:
+                        if item.is_dir():
+                            dir_size = _get_directory_size(item)
+                            shutil.rmtree(item)
+                            total_cleaned += 1
+                            total_freed_space += dir_size
+                            logger.info(f"🗑️ Удалено: {item.name} ({dir_size / 1024 / 1024:.1f} MB)")
+
+                        elif item.is_file() and item.suffix in ['.zip', '.tmp']:
+                            file_size = item.stat().st_size
+                            item.unlink()
+                            total_cleaned += 1
+                            total_freed_space += file_size
+                            logger.info(f"🗑️ Удален файл: {item.name} ({file_size / 1024 / 1024:.1f} MB)")
+
+                        # Проверяем, освободилось ли достаточно места
+                        if emergency_cleanup:
+                            current_free = shutil.disk_usage("/").free / (1024 ** 3)
+                            if current_free > 10:  # Освободили до 10GB - останавливаемся
+                                logger.info(f"✅ Освобождено достаточно места: {current_free:.1f} GB")
+                                break
+
+                except Exception as e:
+                    logger.warning(f"Не удалось удалить {item}: {e}")
+
+        final_free_gb = shutil.disk_usage("/").free / (1024 ** 3)
+        logger.info(
+            f"✅ Очистка завершена. Удалено: {total_cleaned} объектов, освобождено: {total_freed_space / 1024 / 1024:.1f} MB")
+        logger.info(f"💾 Теперь свободно: {final_free_gb:.1f} GB")
+
+        return {
+            "cleaned_items": total_cleaned,
+            "freed_space_mb": round(total_freed_space / 1024 / 1024, 1),
+            "free_space_before_gb": round(free_gb, 1),
+            "free_space_after_gb": round(final_free_gb, 1),
+            "emergency_cleanup": emergency_cleanup,
+            "days_old": days_old
+        }
 
     except Exception as e:
-        logger.exception(f"Ошибка при очистке файлов: {e}")
-        raise
+        logger.exception(f"❌ Ошибка при очистке файлов: {e}")
+        return {"error": str(e)}
+
+
+def _get_directory_size(path: Path) -> int:
+    """Вычисляет размер директории в байтах"""
+    total_size = 0
+    try:
+        for file_path in path.rglob('*'):
+            if file_path.is_file():
+                total_size += file_path.stat().st_size
+    except:
+        pass
+    return total_size
+
+
+# Мониторинг диска перед каждой обработкой
+def check_disk_space_before_processing():
+    """Проверяет место перед обработкой нового исследования"""
+    import shutil
+
+    disk_usage = shutil.disk_usage("/")
+    free_gb = disk_usage.free / (1024 ** 3)
+
+    if free_gb < 2:  # Меньше 2GB - срочно чистим
+        logger.warning(f"🚨 КРИТИЧЕСКИ МАЛО МЕСТА! Всего {free_gb:.1f} GB. Запуск очистки...")
+        cleanup_old_files_task.delay(0, True)  # Экстренная очистка
+        return False
+    elif free_gb < 5:  # Меньше 5GB - предупредительная очистка
+        logger.warning(f"⚠️ Мало свободного места: {free_gb:.1f} GB. Запуск очистки...")
+        cleanup_old_files_task.delay(1, False)
+
+    return True
 
 
 # Конфигурация периодических задач
 celery_app.conf.beat_schedule = {
-    'cleanup-old-files-daily': {
-        'task': 'cleanup_old_files_task',
-        'schedule': 24 * 60 * 60.0,
-        'args': (7,)
+    "cleanup-old-files-hourly": {
+        "task": "cleanup_old_files_task",
+        "schedule": 60 * 60.0,
+        "args": (1, False),
+    },
+    "monitor-disk-space": {
+        "task": "cleanup_old_files_task",
+        "schedule": 30 * 60.0,
+        "args": (0, True),
     },
 }

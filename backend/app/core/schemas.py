@@ -1,14 +1,21 @@
 import json
-from enum import Enum
-from pydantic import BaseModel, EmailStr, Field, field_validator, ConfigDict, computed_field
 from datetime import datetime
-from typing import List, Optional, Dict, Any, Union
 from enum import Enum
+from typing import Any, Dict, List, Optional, Union
+
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    EmailStr,
+    Field,
+    computed_field,
+    field_validator,
+)
+
 from .models import StudyStatus
 
-
-
 # Модели для авторизации
+
 
 class UserBase(BaseModel):
     email: EmailStr = Field(..., description="Email пользователя")
@@ -61,24 +68,29 @@ class TokenResponse(BaseModel):
     refresh_token: str = Field(..., description="Refresh token")
     token_type: str = Field(default="bearer", description="Тип токена")
 
+
 class RefreshTokenRequest(BaseModel):
     refresh_token: str
 
 
 # Схемы для обработки исследований
 
+
 class StudyBase(BaseModel):
     """Базовая схема исследований"""
+
     filename: str
 
 
 class StudyCreate(StudyBase):
     """Схема для создания нового исследования"""
+
     pass
 
 
 class StudyUpdate(BaseModel):
     """Схема для обновления результатов обработки исследования"""
+
     study_uid: Optional[str] = None
     series_uid: Optional[str] = None
     processing_status: Optional[StudyStatus] = None
@@ -92,9 +104,11 @@ class StudyUpdate(BaseModel):
     heatmap_metadata: Optional[Dict[str, Any]] = None
     error_message: Optional[str] = None
 
+
 # Дополнительная схема для координат локализации
 class PathologyLocalization(BaseModel):
     """Схема для координат локализации патологии"""
+
     x_min: float
     x_max: float
     y_min: float
@@ -103,8 +117,10 @@ class PathologyLocalization(BaseModel):
     z_max: float
     confidence: Optional[float] = None
 
+
 class StudyResponse(StudyBase):
     """Схема для ответа"""
+
     model_config = ConfigDict(from_attributes=True)
 
     id: int
@@ -130,23 +146,26 @@ class StudyResponse(StudyBase):
     created_at: datetime
     updated_at: datetime
     needs_verification: bool = Field(False, description="Требуется проверка врачом")
-    verification_score: Optional[float] = Field(None, description="Оценка достоверности AI")
-    verification_warnings: List[str] = Field([], description="Предупреждения верификации")
+    verification_score: Optional[float] = Field(
+        None, description="Оценка достоверности AI"
+    )
+    verification_warnings: List[str] = Field(
+        [], description="Предупреждения верификации"
+    )
     heatmap_visualization_url: Optional[str] = None
-
 
     @computed_field(description="Информация о heatmap данных")
     @property
     def heatmap_data_info(self) -> Optional[Dict]:
         if self.heatmap_metadata and isinstance(self.heatmap_metadata, dict):
-            return self.heatmap_metadata.get('heatmap_data_info')
+            return self.heatmap_metadata.get("heatmap_data_info")
         return None
 
     @computed_field(description="Статистика heatmap")
     @property
     def heatmap_statistics(self) -> Optional[Dict]:
         if self.heatmap_metadata and isinstance(self.heatmap_metadata, dict):
-            return self.heatmap_metadata.get('heatmap_statistics')
+            return self.heatmap_metadata.get("heatmap_statistics")
         return None
 
     @computed_field(description="Требуется проверка врачом")
@@ -154,27 +173,26 @@ class StudyResponse(StudyBase):
     def needs_review(self) -> bool:
         return self.needs_verification
 
-
-    @field_validator('processing_status', mode='before')
+    @field_validator("processing_status", mode="before")
     @classmethod
     def validate_processing_status(cls, v):
         """Преобразуем статусы в русскоязычные для ответа"""
         status_mapping = {
-            'uploaded': 'загружено',
-            'extracting': 'распаковывается',
-            'validating': 'проверяется',
-            'processing_ml': 'анализируется_ИИ',
-            'completed': 'обработано',
-            'failed': 'ошибка',
-            'needs_review': 'требует_проверки',
+            "uploaded": "загружено",
+            "extracting": "распаковывается",
+            "validating": "проверяется",
+            "processing_ml": "анализируется_ИИ",
+            "completed": "обработано",
+            "failed": "ошибка",
+            "needs_review": "требует_проверки",
             # Английские версии на всякий случай
-            'UPLOADED': 'загружено',
-            'EXTRACTING': 'распаковывается',
-            'VALIDATING': 'проверяется',
-            'PROCESSING_ML': 'анализируется_ИИ',
-            'COMPLETED': 'обработано',
-            'FAILED': 'ошибка',
-            'NEEDS_REVIEW': 'требует_проверки'
+            "UPLOADED": "загружено",
+            "EXTRACTING": "распаковывается",
+            "VALIDATING": "проверяется",
+            "PROCESSING_ML": "анализируется_ИИ",
+            "COMPLETED": "обработано",
+            "FAILED": "ошибка",
+            "NEEDS_REVIEW": "требует_проверки",
         }
 
         if isinstance(v, StudyStatus):
@@ -183,16 +201,18 @@ class StudyResponse(StudyBase):
             return status_mapping.get(v.lower(), v)
         return v
 
-    @field_validator('created_at', 'updated_at', mode='before')
+    @field_validator("created_at", "updated_at", mode="before")
     @classmethod
     def validate_datetime(cls, v):
         """Преобразуем datetime объекты в строки для сериализации"""
         if v is None:
             return None
-        return v.isoformat() if hasattr(v, 'isoformat') else v
+        return v.isoformat() if hasattr(v, "isoformat") else v
+
 
 class StudyListResponse(BaseModel):
     """Схема для списка исследований с пагинацией"""
+
     studies: List[StudyResponse]
     total: int
     page: int
@@ -202,6 +222,7 @@ class StudyListResponse(BaseModel):
 
 class StudyStatusResponse(BaseModel):
     """Простой ответ по статусу"""
+
     id: int
     processing_status: StudyStatus
     progress: Optional[float] = None
@@ -210,10 +231,6 @@ class StudyStatusResponse(BaseModel):
 
 class ExcelReportRequest(BaseModel):
     """Схема генерации отчета в Excel"""
+
     study_ids: List[int]
     include_metadata: bool = True
-
-
-
-
-

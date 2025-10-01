@@ -4,28 +4,28 @@
 обновление статусов/результатов в БД.
 """
 
-import os
-import zipfile
-import tempfile
-import shutil
-import time
 import asyncio
-from concurrent.futures import ThreadPoolExecutor
-from typing import Dict, List, Optional, Tuple, Any
-from pathlib import Path
-import pydicom
-from pydicom.errors import InvalidDicomError
 import logging
+import os
+import shutil
+import tempfile
+import time
+import zipfile
+from concurrent.futures import ThreadPoolExecutor
+from pathlib import Path
+from typing import Any, Dict, List, Optional, Tuple
 
+import pandas as pd
+import pydicom
+from fastapi import Depends
+from pydicom.errors import InvalidDicomError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 from sqlalchemy.sql import func
-from fastapi import Depends
-import pandas as pd
 
-from ..core.models import Study, StudyStatus
-from ..core.db_helper import db_helper
 from ..core.config import settings
+from ..core.db_helper import db_helper
+from ..core.models import Study, StudyStatus
 
 logger = logging.getLogger(__name__)
 
@@ -35,6 +35,7 @@ thread_pool = ThreadPoolExecutor(max_workers=getattr(settings, "max_workers", 4)
 
 class DicomProcessingError(Exception):
     """Ошибка обработки DICOM-исследования"""
+
     pass
 
 
@@ -62,7 +63,7 @@ async def process_dicom_study(
     zip_file_path: str,
     study_id: int,
     session: AsyncSession,
-    output_dir: str = "processed_studies"
+    output_dir: str = "processed_studies",
 ) -> Dict:
     """
     Асинхронная обёртка для обработки исследования: запускает синхронную
@@ -93,7 +94,7 @@ async def process_dicom_study(
             zip_file_path,
             study_id,
             output_dir,
-            processing_result
+            processing_result,
         )
 
         # Записываем результаты в БД
@@ -106,11 +107,13 @@ async def process_dicom_study(
 
     except Exception as e:
         logger.exception(f"Ошибка обработки исследования {study_id}: {e}")
-        processing_result.update({
-            "processing_status": StudyStatus.FAILED,
-            "error_message": str(e),
-            "ready_for_inference": False
-        })
+        processing_result.update(
+            {
+                "processing_status": StudyStatus.FAILED,
+                "error_message": str(e),
+                "ready_for_inference": False,
+            }
+        )
         await update_study_status(study_id, StudyStatus.FAILED, session, str(e))
 
     finally:
@@ -120,10 +123,7 @@ async def process_dicom_study(
 
 
 def _process_dicom_study_sync(
-    zip_file_path: str,
-    study_id: int,
-    output_dir: str,
-    processing_result: Dict
+    zip_file_path: str, study_id: int, output_dir: str, processing_result: Dict
 ) -> Dict:
     """
     Синхронная часть обработки (будет выполняться в thread pool):
@@ -135,7 +135,9 @@ def _process_dicom_study_sync(
     temp_extract_dir: Optional[str] = None
     try:
         temp_extract_dir = tempfile.mkdtemp(prefix=f"study_{study_id}_")
-        logger.info(f"Извлечение исследования {study_id} во временную папку {temp_extract_dir}")
+        logger.info(
+            f"Извлечение исследования {study_id} во временную папку {temp_extract_dir}"
+        )
 
         dicom_files = extract_zip_archive(zip_file_path, temp_extract_dir)
 
@@ -150,29 +152,33 @@ def _process_dicom_study_sync(
         organized_path = organize_dicom_files(
             series_groups,
             output_dir,
-            study_metadata.get("StudyInstanceUID", f"study_{study_id}")
+            study_metadata.get("StudyInstanceUID", f"study_{study_id}"),
         )
         logger.info(f"📊 Результаты парсинга:")
         logger.info(f"  Валидных файлов: {len(valid_files)}")
         logger.info(f"  Study UID: {study_metadata.get('StudyInstanceUID', 'N/A')}")
         logger.info(f"  Series UID: {study_metadata.get('SeriesInstanceUID', 'N/A')}")
         logger.info(f"  Структура: {study_metadata.get('study_structure', {})}")
-        processing_result.update({
-            "dicom_files": [str(p) for p in valid_files],
-            "study_metadata": study_metadata,
-            "series_count": len(series_groups),
-            "total_instances": len(valid_files),
-            "organized_path": organized_path,
-            "ready_for_inference": True,
-            "processing_status": StudyStatus.COMPLETED
-        })
+        processing_result.update(
+            {
+                "dicom_files": [str(p) for p in valid_files],
+                "study_metadata": study_metadata,
+                "series_count": len(series_groups),
+                "total_instances": len(valid_files),
+                "organized_path": organized_path,
+                "ready_for_inference": True,
+                "processing_status": StudyStatus.COMPLETED,
+            }
+        )
 
     except Exception as e:
-        processing_result.update({
-            "processing_status": StudyStatus.FAILED,
-            "error_message": str(e),
-            "ready_for_inference": False
-        })
+        processing_result.update(
+            {
+                "processing_status": StudyStatus.FAILED,
+                "error_message": str(e),
+                "ready_for_inference": False,
+            }
+        )
         raise
 
     finally:
@@ -180,7 +186,9 @@ def _process_dicom_study_sync(
             try:
                 shutil.rmtree(temp_extract_dir)
             except Exception as e:
-                logger.warning(f"Не удалось удалить временную папку {temp_extract_dir}: {e}")
+                logger.warning(
+                    f"Не удалось удалить временную папку {temp_extract_dir}: {e}"
+                )
 
     return processing_result
 
@@ -189,7 +197,7 @@ async def update_study_status(
     study_id: int,
     status: StudyStatus,
     session: AsyncSession,
-    error_message: Optional[str] = None
+    error_message: Optional[str] = None,
 ):
     """Обновление только статуса исследования и (при необходимости) сообщения об ошибке"""
     try:
@@ -214,11 +222,7 @@ async def update_study_status(
         await session.rollback()
 
 
-async def update_study_results(
-    study_id: int,
-    results: Dict,
-    session: AsyncSession
-):
+async def update_study_results(study_id: int, results: Dict, session: AsyncSession):
     """
     Обновление записи исследования результатами обработки.
     Поддерживает разные форматы поля processing_status (enum / строка).
@@ -250,13 +254,17 @@ async def update_study_results(
             "total_studies": study_structure.get("total_studies", 1),
             "total_series": study_structure.get("total_series", 1),
             "is_multi_study": study_structure.get("is_multi_study", False),
-            "is_multi_series": study_structure.get("is_multi_series", False)
+            "is_multi_series": study_structure.get("is_multi_series", False),
         }
 
         study.probability_of_pathology = results.get("probability_of_pathology", 0.0)
         study.pathology = results.get("pathology", 0)
-        study.most_dangerous_pathology_type = results.get("most_dangerous_pathology_type", "")
-        study.pathology_localization_coords = results.get("pathology_localization_coords")
+        study.most_dangerous_pathology_type = results.get(
+            "most_dangerous_pathology_type", ""
+        )
+        study.pathology_localization_coords = results.get(
+            "pathology_localization_coords"
+        )
         study.heatmap_path = results.get("heatmap_path", "")
         study.heatmap_format = results.get("heatmap_format", "")
         study.heatmap_metadata = results.get("heatmap_metadata")
@@ -282,15 +290,22 @@ async def update_study_results(
                 resolved_status = legacy_map.get(status_raw, StudyStatus.FAILED)
 
         study.processing_status = resolved_status
-        study.time_of_processing = results.get("processing_time", study.time_of_processing)
-        study.total_instances = results.get("total_instances", study.total_instances or 0)
+        study.time_of_processing = results.get(
+            "processing_time", study.time_of_processing
+        )
+        study.total_instances = results.get(
+            "total_instances", study.total_instances or 0
+        )
         study.series_count = results.get("series_count", study.series_count or 0)
 
         study.updated_at = func.now()
         await session.commit()
-        logger.info(f"Исследование {study_id} обновлено результатами обработки (status={resolved_status})")
         logger.info(
-            f"  Структура: {study_structure.get('total_studies', 1)} studies, {study_structure.get('total_series', 1)} series")
+            f"Исследование {study_id} обновлено результатами обработки (status={resolved_status})"
+        )
+        logger.info(
+            f"  Структура: {study_structure.get('total_studies', 1)} studies, {study_structure.get('total_series', 1)} series"
+        )
 
     except Exception as e:
         logger.exception(f"Не удалось обновить результаты исследования {study_id}: {e}")
@@ -312,8 +327,12 @@ def parse_dicom_files(file_paths: List[Path]) -> Tuple[Dict, List[Path]]:
             ds = pydicom.dcmread(str(file_path), force=True, stop_before_pixels=True)
 
             # Проверяем обязательные поля
-            if not hasattr(ds, "StudyInstanceUID") or not hasattr(ds, "SeriesInstanceUID"):
-                logger.warning(f"Файл {file_path} без StudyInstanceUID/SeriesInstanceUID — пропускаем")
+            if not hasattr(ds, "StudyInstanceUID") or not hasattr(
+                ds, "SeriesInstanceUID"
+            ):
+                logger.warning(
+                    f"Файл {file_path} без StudyInstanceUID/SeriesInstanceUID — пропускаем"
+                )
                 continue
 
             study_uid = str(ds.StudyInstanceUID).strip()
@@ -337,7 +356,7 @@ def parse_dicom_files(file_paths: List[Path]) -> Tuple[Dict, List[Path]]:
                     "SeriesNumber": getattr(ds, "SeriesNumber", ""),
                     "Modality": getattr(ds, "Modality", ""),
                     "StudyInstanceUID": study_uid,  # Добавляем Study UID для серии
-                    "files": []
+                    "files": [],
                 }
 
             series_info[series_uid]["files"].append(file_path)
@@ -349,7 +368,9 @@ def parse_dicom_files(file_paths: List[Path]) -> Tuple[Dict, List[Path]]:
             logger.warning(f"Ошибка чтения {file_path}: {e}")
 
     # Анализируем структуру исследования
-    study_metadata["study_structure"] = analyze_study_structure(study_uids, series_uids, series_info)
+    study_metadata["study_structure"] = analyze_study_structure(
+        study_uids, series_uids, series_info
+    )
 
     # Выбираем основной StudyInstanceUID (самый частый или первый)
     primary_study_uid = select_primary_study_uid(series_info)
@@ -362,12 +383,15 @@ def parse_dicom_files(file_paths: List[Path]) -> Tuple[Dict, List[Path]]:
     study_metadata["series_info"] = series_info
 
     logger.info(
-        f"📊 Анализ исследования: {len(study_uids)} Study UID, {len(series_uids)} Series UID, {len(valid_files)} файлов")
+        f"📊 Анализ исследования: {len(study_uids)} Study UID, {len(series_uids)} Series UID, {len(valid_files)} файлов"
+    )
 
     return study_metadata, valid_files
 
 
-def analyze_study_structure(study_uids: set, series_uids: set, series_info: Dict) -> Dict:
+def analyze_study_structure(
+    study_uids: set, series_uids: set, series_info: Dict
+) -> Dict:
     """Анализирует структуру исследования"""
     structure = {
         "total_studies": len(study_uids),
@@ -376,7 +400,7 @@ def analyze_study_structure(study_uids: set, series_uids: set, series_info: Dict
         "is_multi_series": len(series_uids) > 1,
         "study_uids": list(study_uids),
         "series_uids": list(series_uids),
-        "series_distribution": {}
+        "series_distribution": {},
     }
 
     for series_uid, info in series_info.items():
@@ -384,7 +408,7 @@ def analyze_study_structure(study_uids: set, series_uids: set, series_info: Dict
             "file_count": len(info["files"]),
             "study_uid": info["StudyInstanceUID"],
             "description": info["SeriesDescription"],
-            "modality": info["Modality"]
+            "modality": info["Modality"],
         }
 
     return structure
@@ -395,7 +419,9 @@ def select_primary_study_uid(series_info: Dict) -> str:
     study_uid_counts = {}
     for series_uid, info in series_info.items():
         study_uid = info["StudyInstanceUID"]
-        study_uid_counts[study_uid] = study_uid_counts.get(study_uid, 0) + len(info["files"])
+        study_uid_counts[study_uid] = study_uid_counts.get(study_uid, 0) + len(
+            info["files"]
+        )
 
     if study_uid_counts:
         return max(study_uid_counts.items(), key=lambda x: x[1])[0]
@@ -473,7 +499,9 @@ def group_files_by_series(file_paths: List[Path]) -> Dict[str, List[Path]]:
             ds = pydicom.dcmread(str(file_path), stop_before_pixels=True)
 
             # Проверяем обязательные UID
-            if not hasattr(ds, "SeriesInstanceUID") or not hasattr(ds, "StudyInstanceUID"):
+            if not hasattr(ds, "SeriesInstanceUID") or not hasattr(
+                ds, "StudyInstanceUID"
+            ):
                 continue
 
             series_uid = str(ds.SeriesInstanceUID).strip()
@@ -492,14 +520,18 @@ def group_files_by_series(file_paths: List[Path]) -> Dict[str, List[Path]]:
         except Exception as e:
             logger.warning(f"Ошибка группировки файла {file_path}: {e}")
 
-    logger.info(f"📁 Группировка: {len(study_series_map)} studies -> {len(series_groups)} series")
+    logger.info(
+        f"📁 Группировка: {len(study_series_map)} studies -> {len(series_groups)} series"
+    )
     for study_uid, series_set in study_series_map.items():
         logger.info(f"  Study {study_uid[:20]}...: {len(series_set)} series")
 
     return series_groups
 
 
-def organize_dicom_files(series_groups: Dict[str, List[Path]], output_dir: str, study_uid: str) -> str:
+def organize_dicom_files(
+    series_groups: Dict[str, List[Path]], output_dir: str, study_uid: str
+) -> str:
     """Копируем DICOM-файлы в плоскую структуру (все файлы в корне исследования)"""
 
     base_dir = Path("/app/processed_studies")
@@ -542,14 +574,18 @@ def organize_dicom_files(series_groups: Dict[str, List[Path]], output_dir: str, 
     logger.info(f"🔍 Проверка: в {study_dir} найдено {len(dcm_files)} .dcm файлов")
 
     if len(dcm_files) == 0:
-        logger.error("❌ КРИТИЧЕСКАЯ ОШИБКА: Файлы не скопировались в плоскую структуру!")
+        logger.error(
+            "❌ КРИТИЧЕСКАЯ ОШИБКА: Файлы не скопировались в плоскую структуру!"
+        )
         # Попробуем альтернативный метод с сохранением оригинальных имен
         return organize_with_original_names(series_groups, study_dir, study_uid)
 
     return str(study_dir)
 
 
-def organize_with_original_names(series_groups: Dict[str, List[Path]], study_dir: Path, study_uid: str) -> str:
+def organize_with_original_names(
+    series_groups: Dict[str, List[Path]], study_dir: Path, study_uid: str
+) -> str:
     """Альтернативный метод: копируем с оригинальными именами файлов"""
 
     logger.info("🔄 Попытка копирования с оригинальными именами")
@@ -578,6 +614,7 @@ def organize_with_original_names(series_groups: Dict[str, List[Path]], study_dir
     logger.info(f"✅ Скопировано {total_files} файлов с оригинальными именами")
     return str(study_dir)
 
+
 def extract_zip_archive(zip_path: str, extract_to: str) -> List[Path]:
     """
     Распаковка ZIP-архива с базовой фильтрацией: исключаем директории,
@@ -586,14 +623,15 @@ def extract_zip_archive(zip_path: str, extract_to: str) -> List[Path]:
     extracted_files: List[Path] = []
     logger.info("Начало обработки")
     try:
-        with zipfile.ZipFile(zip_path, 'r') as zip_ref:
+        with zipfile.ZipFile(zip_path, "r") as zip_ref:
             bad_file = zip_ref.testzip()
             if bad_file:
                 raise DicomProcessingError(f"Поврежденный файл в архиве: {bad_file}")
 
         with zipfile.ZipFile(zip_path, "r") as zip_ref:
             file_list = [
-                f for f in zip_ref.namelist()
+                f
+                for f in zip_ref.namelist()
                 if not f.endswith("/") and not os.path.basename(f).startswith(".")
             ]
 
@@ -611,13 +649,19 @@ def extract_zip_archive(zip_path: str, extract_to: str) -> List[Path]:
                     extracted_path_str = zip_ref.extract(file_name, extract_to)
                     extracted_path = Path(extracted_path_str)
                     checked_files += 1
-                    logger.debug(f"Проверяю, является ли {extracted_path.name}  файлом DICOM...")
+                    logger.debug(
+                        f"Проверяю, является ли {extracted_path.name}  файлом DICOM..."
+                    )
                     if is_likely_dicom_file(extracted_path):
                         extracted_files.append(extracted_path)
-                        logger.debug(f"✓ {extracted_path.name} идентифицирован как DICOM файл")
+                        logger.debug(
+                            f"✓ {extracted_path.name} идентифицирован как DICOM файл"
+                        )
                     else:
                         skipped_extensions.add(extracted_path.suffix or "no_extension")
-                        logger.debug(f"✗ {extracted_path.name} не идентифицирован как DICOM файл")
+                        logger.debug(
+                            f"✗ {extracted_path.name} не идентифицирован как DICOM файл"
+                        )
                         try:
                             os.remove(extracted_path)
                         except Exception:
@@ -657,13 +701,24 @@ def extract_zip_archive(zip_path: str, extract_to: str) -> List[Path]:
 def is_likely_dicom_file(file_path: Path) -> bool:
     """Эвристическая проверка, похож ли файл на DICOM (по размеру, расширению, сигнатуре)"""
     try:
-        if not file_path.exists() or file_path.stat().st_size < 128:  # Reduced from 1024
+        if (
+            not file_path.exists() or file_path.stat().st_size < 128
+        ):  # Reduced from 1024
             return False
 
         dicom_extensions = {".dcm", ".dic", ".dicom", ""}
         file_suffix = file_path.suffix.lower()
 
-        skip_extensions = {".txt", ".log", ".xml", ".json", ".zip", ".rar", ".exe", ".dll"}
+        skip_extensions = {
+            ".txt",
+            ".log",
+            ".xml",
+            ".json",
+            ".zip",
+            ".rar",
+            ".exe",
+            ".dll",
+        }
         if file_suffix in skip_extensions:
             return False
 
@@ -679,10 +734,14 @@ def is_likely_dicom_file(file_path: Path) -> bool:
         if len(header) >= 4 and header[0:4] in [b"DICM", b"MEDI", b"ACR"]:
             return True
 
-
         if len(header) >= 8:
             for i in range(0, min(64, len(header) - 4), 2):
-                if header[i:i + 2] in [b'\x02\x00', b'\x08\x00', b'\x10\x00', b'\x20\x00']:
+                if header[i : i + 2] in [
+                    b"\x02\x00",
+                    b"\x08\x00",
+                    b"\x10\x00",
+                    b"\x20\x00",
+                ]:
                     return True
 
         if file_suffix == "":
@@ -695,6 +754,7 @@ def is_likely_dicom_file(file_path: Path) -> bool:
         # When in doubt, let pydicom decide later
         return True
 
+
 class StudyService:
     """Сервис для CRUD-операций с исследованиями"""
 
@@ -704,7 +764,7 @@ class StudyService:
         user_id: int,
         filename: str,
         file_path: str,
-        session: AsyncSession = Depends(db_helper.session_getter)
+        session: AsyncSession = Depends(db_helper.session_getter),
     ) -> Study:
         """Создать новое исследование в базе"""
         try:
@@ -714,7 +774,7 @@ class StudyService:
                 file_path=file_path,
                 processing_status=StudyStatus.UPLOADED,
                 created_at=func.now(),
-                updated_at=func.now()
+                updated_at=func.now(),
             )
             session.add(study)
             await session.commit()
@@ -728,17 +788,11 @@ class StudyService:
 
     @classmethod
     async def get_study(
-        cls,
-        study_id: int,
-        user_id: int,
-        session: AsyncSession
+        cls, study_id: int, user_id: int, session: AsyncSession
     ) -> Optional[Study]:
         """Получить исследование по ID и ID пользователя (ограничение доступа)"""
         try:
-            stmt = select(Study).where(
-                Study.id == study_id,
-                Study.user_id == user_id
-            )
+            stmt = select(Study).where(Study.id == study_id, Study.user_id == user_id)
             result = await session.execute(stmt)
             return result.scalar_one_or_none()
         except Exception as e:
@@ -747,11 +801,7 @@ class StudyService:
 
     @classmethod
     async def get_user_studies(
-        cls,
-        user_id: int,
-        session: AsyncSession,
-        limit: int = 50,
-        offset: int = 0
+        cls, user_id: int, session: AsyncSession, limit: int = 50, offset: int = 0
     ) -> List[Study]:
         """Получить список исследований пользователя (пагинация)"""
         try:
@@ -765,17 +815,15 @@ class StudyService:
             result = await session.execute(stmt)
             return result.scalars().all()
         except Exception as e:
-            logger.exception(f"Ошибка при получении исследований пользователя {user_id}: {e}")
+            logger.exception(
+                f"Ошибка при получении исследований пользователя {user_id}: {e}"
+            )
             return []
 
-
-#----------БЛОК ДЛЯ ДЕМО РЕЖИМА---------------------------
+    # ----------БЛОК ДЛЯ ДЕМО РЕЖИМА---------------------------
     @classmethod
     async def create_demo_study(
-            cls,
-            filename: str,
-            file_path: str,
-            session: AsyncSession
+        cls, filename: str, file_path: str, session: AsyncSession
     ) -> Study:
         """Создать исследование для демо-режима (без привязки к пользователю)"""
         try:
@@ -786,7 +834,7 @@ class StudyService:
                 file_path=file_path,
                 processing_status=StudyStatus.UPLOADED,
                 created_at=func.now(),
-                updated_at=func.now()
+                updated_at=func.now(),
             )
             session.add(study)
             await session.commit()
@@ -797,11 +845,12 @@ class StudyService:
             await session.rollback()
             logger.exception(f"Ошибка при создании демо-исследования: {e}")
             raise
+
     @classmethod
     async def get_all_studies(cls, session: AsyncSession, limit: int = 100):
         """Получить все исследования (для демо)"""
-        from sqlalchemy import select
         from app.core.models import Study
+        from sqlalchemy import select
 
         stmt = select(Study).order_by(Study.created_at.desc()).limit(limit)
         result = await session.execute(stmt)
@@ -810,22 +859,27 @@ class StudyService:
     @classmethod
     async def get_study_by_id(cls, study_id: int, session: AsyncSession):
         """Получить исследование по ID без проверки пользователя"""
-        from sqlalchemy import select
         from app.core.models import Study
+        from sqlalchemy import select
 
         stmt = select(Study).where(Study.id == study_id)
         result = await session.execute(stmt)
         return result.scalar_one_or_none()
 
-#-------------КОНЕЦ БЛОКА---------------------------------------------
 
-def create_excel_report(processing_results: List[Dict[str, Any]], output_path: str) -> str:
+# -------------КОНЕЦ БЛОКА---------------------------------------------
+
+
+def create_excel_report(
+    processing_results: List[Dict[str, Any]], output_path: str
+) -> str:
     """Формирует улучшенный Excel-отчет в формате ТЗ с форматированием."""
+    from datetime import datetime
+
     import pandas as pd
     from openpyxl import load_workbook
-    from openpyxl.styles import Font, PatternFill, Border, Side, Alignment
+    from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
     from openpyxl.utils.dataframe import dataframe_to_rows
-    from datetime import datetime
 
     report_data = []
 
@@ -836,7 +890,11 @@ def create_excel_report(processing_results: List[Dict[str, Any]], output_path: s
         raw_status = result.get("processing_status", "Failure")
         if str(raw_status).lower() in {"completed", "success", "ok", "обработано"}:
             status_str = "Success"
-        elif str(raw_status).lower() in {"needsreview", "needs_review", "требует_проверки"}:
+        elif str(raw_status).lower() in {
+            "needsreview",
+            "needs_review",
+            "требует_проверки",
+        }:
             status_str = "Needs Review"
         else:
             status_str = "Failure"
@@ -858,13 +916,15 @@ def create_excel_report(processing_results: List[Dict[str, Any]], output_path: s
             "study_uid": study_uid,
             "series_uid": series_uid,
             "study_structure": structure_info,
-            "probability_of_pathology": round(result.get("probability_of_pathology", 0.0), 4),
+            "probability_of_pathology": round(
+                result.get("probability_of_pathology", 0.0), 4
+            ),
             "pathology": result.get("pathology", 0),
             "processing_status": status_str,
             "time_of_processing": round(result.get("processing_time", 0.0), 2),
             "most_dangerous_pathology_type": pathology_type,
             "pathology_localization": "",
-            "generation_date": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            "generation_date": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
         }
 
         loc = result.get("pathology_localization_coords")
@@ -876,19 +936,18 @@ def create_excel_report(processing_results: List[Dict[str, Any]], output_path: s
                 str(loc.get("y_min", "")),
                 str(loc.get("y_max", "")),
                 str(loc.get("z_min", "")),
-                str(loc.get("z_max", ""))
+                str(loc.get("z_max", "")),
             ]
             row["pathology_localization"] = ",".join(coords)
-            print(f"Локализация добавлена: {row['pathology_localization']}")  # Для отладки
+            print(
+                f"Локализация добавлена: {row['pathology_localization']}"
+            )  # Для отладки
         else:
             print(f"Локализация не найдена или неверный формат: {loc}")
 
-
         report_data.append(row)
 
-
     df = pd.DataFrame(report_data)
-
 
     column_names = {
         "path_to_study": "path_to_study",
@@ -900,23 +959,25 @@ def create_excel_report(processing_results: List[Dict[str, Any]], output_path: s
         "time_of_processing": "time_of_processing",
         "most_dangerous_pathology_type": "most_dangerous_pathology_type",
         "pathology_localization": "pathology_localization",
-        "generation_date": "generation_date"
+        "generation_date": "generation_date",
     }
 
     df = df.rename(columns=column_names)
 
-    df.to_excel(output_path, index=False, engine='openpyxl')
+    df.to_excel(output_path, index=False, engine="openpyxl")
 
     wb = load_workbook(output_path)
     ws = wb.active
 
     header_font = Font(bold=True, color="FFFFFF")
-    header_fill = PatternFill(start_color="366092", end_color="366092", fill_type="solid")
+    header_fill = PatternFill(
+        start_color="366092", end_color="366092", fill_type="solid"
+    )
     border = Border(
-        left=Side(style='thin'),
-        right=Side(style='thin'),
-        top=Side(style='thin'),
-        bottom=Side(style='thin')
+        left=Side(style="thin"),
+        right=Side(style="thin"),
+        top=Side(style="thin"),
+        bottom=Side(style="thin"),
     )
 
     for cell in ws[1]:
@@ -925,20 +986,28 @@ def create_excel_report(processing_results: List[Dict[str, Any]], output_path: s
         cell.alignment = Alignment(horizontal="center", vertical="center")
         cell.border = border
 
-    for row in ws.iter_rows(min_row=2, max_row=ws.max_row, min_col=1, max_col=ws.max_column):
+    for row in ws.iter_rows(
+        min_row=2, max_row=ws.max_row, min_col=1, max_col=ws.max_column
+    ):
         for cell in row:
             cell.border = border
             cell.alignment = Alignment(vertical="center")
 
             if cell.column == 5:
                 if cell.value == 1:
-                    cell.fill = PatternFill(start_color="FFE6E6", end_color="FFE6E6", fill_type="solid")
+                    cell.fill = PatternFill(
+                        start_color="FFE6E6", end_color="FFE6E6", fill_type="solid"
+                    )
                 else:
-                    cell.fill = PatternFill(start_color="E6F7E6", end_color="E6F7E6", fill_type="solid")
+                    cell.fill = PatternFill(
+                        start_color="E6F7E6", end_color="E6F7E6", fill_type="solid"
+                    )
 
             elif cell.column == 4:
                 if isinstance(cell.value, (int, float)) and cell.value > 0.5:
-                    cell.fill = PatternFill(start_color="FFF2CC", end_color="FFF2CC", fill_type="solid")
+                    cell.fill = PatternFill(
+                        start_color="FFF2CC", end_color="FFF2CC", fill_type="solid"
+                    )
 
     for column in ws.columns:
         max_length = 0
@@ -954,19 +1023,19 @@ def create_excel_report(processing_results: List[Dict[str, Any]], output_path: s
         adjusted_width = min(max_length + 2, 50)
         ws.column_dimensions[column_letter].width = adjusted_width
 
-
     ws.insert_rows(1, 2)
-    ws['A1'] = f"Отчет по анализу КТ исследований - {datetime.now().strftime('%d.%m.%Y %H:%M')}"
-    ws['A1'].font = Font(bold=True, size=14)
+    ws["A1"] = (
+        f"Отчет по анализу КТ исследований - {datetime.now().strftime('%d.%m.%Y %H:%M')}"
+    )
+    ws["A1"].font = Font(bold=True, size=14)
 
     total_studies = len(report_data)
     pathology_count = sum(1 for r in report_data if r["pathology"] == 1)
-    ws[
-        'A2'] = f"Всего исследований: {total_studies}, Патология обнаружена: {pathology_count}, Норма: {total_studies - pathology_count}"
-    ws['A2'].font = Font(italic=True)
-
+    ws["A2"] = (
+        f"Всего исследований: {total_studies}, Патология обнаружена: {pathology_count}, Норма: {total_studies - pathology_count}"
+    )
+    ws["A2"].font = Font(italic=True)
 
     wb.save(output_path)
 
     return output_path
-

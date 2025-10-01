@@ -1,8 +1,10 @@
-import numpy as np
-from scipy import ndimage
-import cv2
 import json
 from pathlib import Path
+
+import cv2
+import numpy as np
+from scipy import ndimage
+
 
 class VerificationEngine:
     def validate_normal_prediction(self, heatmap_data: dict, study_id: int) -> dict:
@@ -12,7 +14,7 @@ class VerificationEngine:
         """
         # Получаем 3D heatmap из данных DS
         error_map_3d = np.array(heatmap_data.get("error_map_3d", []))
-        
+
         if error_map_3d.size == 0:
             return self._error_response("Heatmap данные отсутствуют")
 
@@ -27,7 +29,7 @@ class VerificationEngine:
             "детали": {},
             "уровень_риска": "низкий",
             "проверенный_срез": slice_index,
-            "форма_heatmap": heatmap_2d.shape
+            "форма_heatmap": heatmap_2d.shape,
         }
 
         # Запускаем проверки
@@ -35,7 +37,7 @@ class VerificationEngine:
             self._check_edge_artifacts(heatmap_2d),
             self._check_attention_chaos(heatmap_2d),
             self._check_suspicious_focus_patterns(heatmap_2d),
-            self._check_heatmap_quality(heatmap_2d)
+            self._check_heatmap_quality(heatmap_2d),
         ]
 
         # Агрегируем результаты
@@ -71,12 +73,14 @@ class VerificationEngine:
         edge_mask[:, -border_width:] = True
 
         corner_size = border_width * 2
-        corners_attention = np.mean([
-            np.mean(heatmap[:corner_size, :corner_size]),
-            np.mean(heatmap[:corner_size, -corner_size:]),
-            np.mean(heatmap[-corner_size:, :corner_size]),
-            np.mean(heatmap[-corner_size:, -corner_size:])
-        ])
+        corners_attention = np.mean(
+            [
+                np.mean(heatmap[:corner_size, :corner_size]),
+                np.mean(heatmap[:corner_size, -corner_size:]),
+                np.mean(heatmap[-corner_size:, :corner_size]),
+                np.mean(heatmap[-corner_size:, -corner_size:]),
+            ]
+        )
 
         center_mask = ~edge_mask
         edge_attention = np.mean(heatmap[edge_mask])
@@ -89,7 +93,7 @@ class VerificationEngine:
                 "уровень_риска": "высокий",
                 "замечание": "Модель уделяет слишком много внимания краям снимка (вероятны артефакты)",
                 "название_проверки": "краевые_артефакты",
-                "детали": f"Края: {edge_attention:.3f}, Центр: {center_attention:.3f}"
+                "детали": f"Края: {edge_attention:.3f}, Центр: {center_attention:.3f}",
             }
 
         if corners_attention > 0.4:
@@ -99,14 +103,14 @@ class VerificationEngine:
                 "уровень_риска": "высокий",
                 "замечание": "Сильный фокус модели на углах изображения (ошибки позиционирования)",
                 "название_проверки": "краевые_артефакты",
-                "детали": f"Внимание по углам: {corners_attention:.3f}"
+                "детали": f"Внимание по углам: {corners_attention:.3f}",
             }
 
         return {
             "пройдено": True,
             "множитель_доверия": 1.0,
             "уровень_риска": "низкий",
-            "название_проверки": "краевые_артефакты"
+            "название_проверки": "краевые_артефакты",
         }
 
     def _check_attention_chaos(self, heatmap: np.ndarray) -> dict:
@@ -125,7 +129,7 @@ class VerificationEngine:
                 "множитель_доверия": 0.4,
                 "уровень_риска": "средний",
                 "замечание": f"Слишком хаотичное распределение внимания ({region_counts[-1]} областей с высокой уверенностью)",
-                "название_проверки": "хаос_внимания"
+                "название_проверки": "хаос_внимания",
             }
 
         attention_std = np.std(heatmap)
@@ -138,14 +142,14 @@ class VerificationEngine:
                 "множитель_доверия": 0.5,
                 "уровень_риска": "средний",
                 "замечание": f"Слишком резкие скачки внимания (коэф.: {spikiness_ratio:.2f})",
-                "название_проверки": "хаос_внимания"
+                "название_проверки": "хаос_внимания",
             }
 
         return {
             "пройдено": True,
             "множитель_доверия": 1.0,
             "уровень_риска": "низкий",
-            "название_проверки": "хаос_внимания"
+            "название_проверки": "хаос_внимания",
         }
 
     def _check_suspicious_focus_patterns(self, heatmap: np.ndarray) -> dict:
@@ -160,12 +164,12 @@ class VerificationEngine:
                 "множитель_доверия": 0.4,
                 "уровень_риска": "высокий",
                 "замечание": "Модель следует за линейными артефактами (полосы сканирования)",
-                "название_проверки": "подозрительные_паттерны"
+                "название_проверки": "подозрительные_паттерны",
             }
 
-        center_region = heatmap[h//4:3*h//4, w//4:3*w//4]
+        center_region = heatmap[h // 4 : 3 * h // 4, w // 4 : 3 * w // 4]
         edge_region_mask = np.ones_like(heatmap, dtype=bool)
-        edge_region_mask[h//4:3*h//4, w//4:3*w//4] = False
+        edge_region_mask[h // 4 : 3 * h // 4, w // 4 : 3 * w // 4] = False
 
         center_attention = np.mean(center_region)
         edge_attention = np.mean(heatmap[edge_region_mask])
@@ -176,11 +180,11 @@ class VerificationEngine:
                 "множитель_доверия": 0.3,
                 "уровень_риска": "высокий",
                 "замечание": "Подозрительный паттерн: пустой центр и активные края (модель игнорирует лёгкие)",
-                "название_проверки": "подозрительные_паттерны"
+                "название_проверки": "подозрительные_паттерны",
             }
 
-        left_half = heatmap[:, :w//2]
-        right_half = heatmap[:, w//2:]
+        left_half = heatmap[:, : w // 2]
+        right_half = heatmap[:, w // 2 :]
         asymmetry_ratio = np.mean(left_half) / (np.mean(right_half) + 1e-8)
 
         if asymmetry_ratio > 5 or asymmetry_ratio < 0.2:
@@ -189,14 +193,14 @@ class VerificationEngine:
                 "множитель_доверия": 0.6,
                 "уровень_риска": "средний",
                 "замечание": f"Сильная асимметрия между левым и правым лёгким (коэф.: {asymmetry_ratio:.2f})",
-                "название_проверки": "подозрительные_паттерны"
+                "название_проверки": "подозрительные_паттерны",
             }
 
         return {
             "пройдено": True,
             "множитель_доверия": 1.0,
             "уровень_риска": "низкий",
-            "название_проверки": "подозрительные_паттерны"
+            "название_проверки": "подозрительные_паттерны",
         }
 
     def _check_heatmap_quality(self, heatmap: np.ndarray) -> dict:
@@ -208,7 +212,7 @@ class VerificationEngine:
                 "множитель_доверия": 0.3,
                 "уровень_риска": "высокий",
                 "замечание": "Модель почти не анализировала изображение",
-                "название_проверки": "качество_heatmap"
+                "название_проверки": "качество_heatmap",
             }
 
         high_attention_ratio = np.sum(heatmap > 0.95) / heatmap.size
@@ -218,14 +222,14 @@ class VerificationEngine:
                 "множитель_доверия": 0.5,
                 "уровень_риска": "средний",
                 "замечание": "Модель выделила слишком большую часть изображения (нет фокуса)",
-                "название_проверки": "качество_heatmap"
+                "название_проверки": "качество_heatmap",
             }
 
         return {
             "пройдено": True,
             "множитель_доверия": 1.0,
             "уровень_риска": "низкий",
-            "название_проверки": "качество_heatmap"
+            "название_проверки": "качество_heatmap",
         }
 
     def _calculate_overall_risk(self, risk_factors: list) -> str:
@@ -248,12 +252,14 @@ class VerificationEngine:
     def _save_verification_results(self, results: dict, study_id: int):
         """Сохраняет результаты верификации в файл"""
         try:
-            verification_dir = Path("/app/processed_studies") / f"study_{study_id}" / "verification"
+            verification_dir = (
+                Path("/app/processed_studies") / f"study_{study_id}" / "verification"
+            )
             verification_dir.mkdir(parents=True, exist_ok=True)
-            
+
             with open(verification_dir / "verification_results.json", "w") as f:
                 json.dump(results, f, indent=2, ensure_ascii=False)
-                
+
         except Exception as e:
             print(f"Ошибка сохранения результатов верификации: {e}")
 
@@ -265,8 +271,9 @@ class VerificationEngine:
             "предупреждения": [message],
             "детали": {},
             "уровень_риска": "высокий",
-            "ошибка": True
+            "ошибка": True,
         }
+
 
 # Глобальный инстанс
 verification_engine = VerificationEngine()

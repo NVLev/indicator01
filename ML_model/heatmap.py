@@ -7,15 +7,17 @@ Original file is located at
     https://colab.research.google.com/drive/1zr5eOW5001fXVJh3G8OVzH-imwvHgb8b
 """
 
-import numpy as np
-import matplotlib.pyplot as plt
-import io
 import base64
+import io
+import json
+from typing import Dict, List, Optional, Tuple
+
+import cv2
+import matplotlib.pyplot as plt
+import numpy as np
 from scipy import ndimage
 from scipy.ndimage import gaussian_filter
-import json
-from typing import Dict, List, Tuple, Optional
-import cv2
+
 
 class CTHeatmapGenerator:
     """
@@ -28,7 +30,9 @@ class CTHeatmapGenerator:
         self.colormap = plt.cm.hot
         self.alpha = 0.6  # Прозрачность для наложений
 
-    def calculate_error_map(self, original: np.ndarray, reconstructed: np.ndarray) -> Dict:
+    def calculate_error_map(
+        self, original: np.ndarray, reconstructed: np.ndarray
+    ) -> Dict:
         """
         Вычисляет карту ошибок между оригинальным и реконструированным изображением.
 
@@ -53,11 +57,13 @@ class CTHeatmapGenerator:
         error_map_smooth = gaussian_filter(error_map_mse, sigma=1.0)
 
         return {
-            'mse_map': error_map_mse.astype(np.float32),
-            'abs_map': error_map_abs.astype(np.float32),
-            'rel_map': error_map_rel.astype(np.float32),
-            'smooth_map': error_map_smooth.astype(np.float32),
-            'combined_map': (error_map_mse * 0.7 + error_map_smooth * 0.3).astype(np.float32)
+            "mse_map": error_map_mse.astype(np.float32),
+            "abs_map": error_map_abs.astype(np.float32),
+            "rel_map": error_map_rel.astype(np.float32),
+            "smooth_map": error_map_smooth.astype(np.float32),
+            "combined_map": (error_map_mse * 0.7 + error_map_smooth * 0.3).astype(
+                np.float32
+            ),
         }
 
     def get_heatmap_statistics(self, error_map: np.ndarray) -> Dict:
@@ -67,20 +73,26 @@ class CTHeatmapGenerator:
         flat_errors = error_map.flatten()
 
         return {
-            'max_error': float(np.max(error_map)),
-            'mean_error': float(np.mean(error_map)),
-            'median_error': float(np.median(error_map)),
-            'std_error': float(np.std(error_map)),
-            'total_error': float(np.sum(error_map)),
-            'percentile_95': float(np.percentile(flat_errors, 95)),
-            'percentile_99': float(np.percentile(flat_errors, 99)),
-            'percentile_99_9': float(np.percentile(flat_errors, 99.9)),
-            'non_zero_voxels': int(np.sum(flat_errors > 0)),
-            'high_error_voxels': int(np.sum(flat_errors > np.percentile(flat_errors, 95))),
-            'error_volume_ratio': float(np.sum(flat_errors > np.mean(flat_errors)) / len(flat_errors))
+            "max_error": float(np.max(error_map)),
+            "mean_error": float(np.mean(error_map)),
+            "median_error": float(np.median(error_map)),
+            "std_error": float(np.std(error_map)),
+            "total_error": float(np.sum(error_map)),
+            "percentile_95": float(np.percentile(flat_errors, 95)),
+            "percentile_99": float(np.percentile(flat_errors, 99)),
+            "percentile_99_9": float(np.percentile(flat_errors, 99.9)),
+            "non_zero_voxels": int(np.sum(flat_errors > 0)),
+            "high_error_voxels": int(
+                np.sum(flat_errors > np.percentile(flat_errors, 95))
+            ),
+            "error_volume_ratio": float(
+                np.sum(flat_errors > np.mean(flat_errors)) / len(flat_errors)
+            ),
         }
 
-    def find_representative_slices(self, error_map: np.ndarray, original: np.ndarray) -> Dict:
+    def find_representative_slices(
+        self, error_map: np.ndarray, original: np.ndarray
+    ) -> Dict:
         """
         Находит наиболее репрезентативные срезы для визуализации.
         """
@@ -88,10 +100,12 @@ class CTHeatmapGenerator:
         slice_errors = np.sum(np.sum(error_map, axis=0), axis=0)  # Sum over x and y
 
         return {
-            'max_error_slice': int(np.argmax(slice_errors)),
-            'mean_error_slice': int(np.argmin(np.abs(slice_errors - np.mean(slice_errors)))),
-            'median_slice': original.shape[2] // 2,
-            'lung_center_slice': self._find_lung_center_slice(original)
+            "max_error_slice": int(np.argmax(slice_errors)),
+            "mean_error_slice": int(
+                np.argmin(np.abs(slice_errors - np.mean(slice_errors)))
+            ),
+            "median_slice": original.shape[2] // 2,
+            "lung_center_slice": self._find_lung_center_slice(original),
         }
 
     def _find_lung_center_slice(self, volume: np.ndarray) -> int:
@@ -103,11 +117,13 @@ class CTHeatmapGenerator:
         slice_intensities = np.mean(np.mean(volume, axis=0), axis=0)
         return int(np.argmin(slice_intensities))
 
-    def generate_slice_visualization(self,
-                                   original: np.ndarray,
-                                   reconstructed: np.ndarray,
-                                   error_map: np.ndarray,
-                                   slice_index: int) -> Dict:
+    def generate_slice_visualization(
+        self,
+        original: np.ndarray,
+        reconstructed: np.ndarray,
+        error_map: np.ndarray,
+        slice_index: int,
+    ) -> Dict:
         """
         Генерирует визуализацию для конкретного среза.
 
@@ -124,78 +140,94 @@ class CTHeatmapGenerator:
         visualizations = {}
 
         # 1. Базовая визуализация: оригинал + реконструкция + ошибки
-        visualizations['basic'] = self._create_basic_visualization(
-            original_slice, reconstructed_slice, error_slice, slice_index)
+        visualizations["basic"] = self._create_basic_visualization(
+            original_slice, reconstructed_slice, error_slice, slice_index
+        )
 
         # 2. Наложение heatmap на оригинал
-        visualizations['overlay'] = self._create_overlay_visualization(
-            original_slice, error_slice, slice_index)
+        visualizations["overlay"] = self._create_overlay_visualization(
+            original_slice, error_slice, slice_index
+        )
 
         # 3. 3D проекция ошибок (MIP - Maximum Intensity Projection)
-        visualizations['mip'] = self._create_mip_visualization(error_map)
+        visualizations["mip"] = self._create_mip_visualization(error_map)
 
         # 4. Сравнение с порогами
-        visualizations['threshold'] = self._create_threshold_visualization(
-            original_slice, error_slice, slice_index)
+        visualizations["threshold"] = self._create_threshold_visualization(
+            original_slice, error_slice, slice_index
+        )
 
         return visualizations
 
-    def _create_basic_visualization(self, original: np.ndarray, reconstructed: np.ndarray,
-                                  error: np.ndarray, slice_index: int) -> str:
+    def _create_basic_visualization(
+        self,
+        original: np.ndarray,
+        reconstructed: np.ndarray,
+        error: np.ndarray,
+        slice_index: int,
+    ) -> str:
         """Создает базовую 4-панельную визуализацию."""
         fig, axes = plt.subplots(2, 2, figsize=(12, 10))
 
         # Оригинал
-        im1 = axes[0, 0].imshow(original, cmap='gray', aspect='auto')
-        axes[0, 0].set_title(f'Оригинал - Срез {slice_index}')
-        axes[0, 0].axis('off')
+        im1 = axes[0, 0].imshow(original, cmap="gray", aspect="auto")
+        axes[0, 0].set_title(f"Оригинал - Срез {slice_index}")
+        axes[0, 0].axis("off")
         plt.colorbar(im1, ax=axes[0, 0], fraction=0.046)
 
         # Реконструкция
-        im2 = axes[0, 1].imshow(reconstructed, cmap='gray', aspect='auto')
-        axes[0, 1].set_title(f'Реконструкция - Срез {slice_index}')
-        axes[0, 1].axis('off')
+        im2 = axes[0, 1].imshow(reconstructed, cmap="gray", aspect="auto")
+        axes[0, 1].set_title(f"Реконструкция - Срез {slice_index}")
+        axes[0, 1].axis("off")
         plt.colorbar(im2, ax=axes[0, 1], fraction=0.046)
 
         # Heatmap ошибок
         vmax = np.percentile(error, 99)  # Чтобы избежать выбросов
-        im3 = axes[1, 0].imshow(error, cmap='hot', aspect='auto', vmin=0, vmax=vmax)
-        axes[1, 0].set_title(f'Heatmap ошибок - Срез {slice_index}')
-        axes[1, 0].axis('off')
+        im3 = axes[1, 0].imshow(error, cmap="hot", aspect="auto", vmin=0, vmax=vmax)
+        axes[1, 0].set_title(f"Heatmap ошибок - Срез {slice_index}")
+        axes[1, 0].axis("off")
         plt.colorbar(im3, ax=axes[1, 0], fraction=0.046)
 
         # Разница
         diff = original - reconstructed
-        im4 = axes[1, 1].imshow(diff, cmap='coolwarm', aspect='auto',
-                               vmin=-np.max(np.abs(diff)), vmax=np.max(np.abs(diff)))
-        axes[1, 1].set_title(f'Разница (Оригинал - Реконструкция) - Срез {slice_index}')
-        axes[1, 1].axis('off')
+        im4 = axes[1, 1].imshow(
+            diff,
+            cmap="coolwarm",
+            aspect="auto",
+            vmin=-np.max(np.abs(diff)),
+            vmax=np.max(np.abs(diff)),
+        )
+        axes[1, 1].set_title(f"Разница (Оригинал - Реконструкция) - Срез {slice_index}")
+        axes[1, 1].axis("off")
         plt.colorbar(im4, ax=axes[1, 1], fraction=0.046)
 
         plt.tight_layout()
         return self._fig_to_base64(fig)
 
-    def _create_overlay_visualization(self, original: np.ndarray, error: np.ndarray,
-                                    slice_index: int) -> str:
+    def _create_overlay_visualization(
+        self, original: np.ndarray, error: np.ndarray, slice_index: int
+    ) -> str:
         """Создает визуализацию с наложением heatmap на оригинал."""
         fig, axes = plt.subplots(1, 2, figsize=(12, 5))
 
         # Оригинал с наложением
-        axes[0].imshow(original, cmap='gray', aspect='auto')
+        axes[0].imshow(original, cmap="gray", aspect="auto")
         vmax = np.percentile(error, 99)
-        im = axes[0].imshow(error, cmap='hot', alpha=self.alpha, aspect='auto', vmin=0, vmax=vmax)
-        axes[0].set_title(f'Наложение heatmap - Срез {slice_index}')
-        axes[0].axis('off')
+        im = axes[0].imshow(
+            error, cmap="hot", alpha=self.alpha, aspect="auto", vmin=0, vmax=vmax
+        )
+        axes[0].set_title(f"Наложение heatmap - Срез {slice_index}")
+        axes[0].axis("off")
         plt.colorbar(im, ax=axes[0], fraction=0.046)
 
         # Бинаризованные области высоких ошибок
         threshold = np.percentile(error, 95)
         binary_mask = error > threshold
 
-        axes[1].imshow(original, cmap='gray', aspect='auto')
-        axes[1].imshow(binary_mask, cmap='Reds', alpha=0.5, aspect='auto')
-        axes[1].set_title(f'Области высоких ошибок (>95%) - Срез {slice_index}')
-        axes[1].axis('off')
+        axes[1].imshow(original, cmap="gray", aspect="auto")
+        axes[1].imshow(binary_mask, cmap="Reds", alpha=0.5, aspect="auto")
+        axes[1].set_title(f"Области высоких ошибок (>95%) - Срез {slice_index}")
+        axes[1].axis("off")
 
         plt.tight_layout()
         return self._fig_to_base64(fig)
@@ -209,32 +241,33 @@ class CTHeatmapGenerator:
 
         fig, axes = plt.subplots(1, 3, figsize=(15, 5))
 
-        im1 = axes[0].imshow(mip_axial, cmap='hot', aspect='auto')
-        axes[0].set_title('MIP - Аксиальная проекция')
-        axes[0].axis('off')
+        im1 = axes[0].imshow(mip_axial, cmap="hot", aspect="auto")
+        axes[0].set_title("MIP - Аксиальная проекция")
+        axes[0].axis("off")
         plt.colorbar(im1, ax=axes[0], fraction=0.046)
 
-        im2 = axes[1].imshow(mip_coronal, cmap='hot', aspect='auto')
-        axes[1].set_title('MIP - Корональная проекция')
-        axes[1].axis('off')
+        im2 = axes[1].imshow(mip_coronal, cmap="hot", aspect="auto")
+        axes[1].set_title("MIP - Корональная проекция")
+        axes[1].axis("off")
         plt.colorbar(im2, ax=axes[1], fraction=0.046)
 
-        im3 = axes[2].imshow(mip_sagittal, cmap='hot', aspect='auto')
-        axes[2].set_title('MIP - Сагиттальная проекция')
-        axes[2].axis('off')
+        im3 = axes[2].imshow(mip_sagittal, cmap="hot", aspect="auto")
+        axes[2].set_title("MIP - Сагиттальная проекция")
+        axes[2].axis("off")
         plt.colorbar(im3, ax=axes[2], fraction=0.046)
 
         plt.tight_layout()
         return self._fig_to_base64(fig)
 
-    def _create_threshold_visualization(self, original: np.ndarray, error: np.ndarray,
-                                      slice_index: int) -> str:
+    def _create_threshold_visualization(
+        self, original: np.ndarray, error: np.ndarray, slice_index: int
+    ) -> str:
         """Создает визуализацию с различными порогами ошибок."""
         thresholds = [
-            ('>50%', np.percentile(error, 50)),
-            ('>75%', np.percentile(error, 75)),
-            ('>90%', np.percentile(error, 90)),
-            ('>95%', np.percentile(error, 95))
+            (">50%", np.percentile(error, 50)),
+            (">75%", np.percentile(error, 75)),
+            (">90%", np.percentile(error, 90)),
+            (">95%", np.percentile(error, 95)),
         ]
 
         fig, axes = plt.subplots(2, 2, figsize=(10, 8))
@@ -243,17 +276,23 @@ class CTHeatmapGenerator:
         for i, (label, threshold) in enumerate(thresholds):
             mask = error > threshold
 
-            axes[i].imshow(original, cmap='gray', aspect='auto')
-            axes[i].imshow(mask, cmap='Reds', alpha=0.6, aspect='auto')
-            axes[i].set_title(f'Ошибки {label} - Срез {slice_index}')
-            axes[i].axis('off')
+            axes[i].imshow(original, cmap="gray", aspect="auto")
+            axes[i].imshow(mask, cmap="Reds", alpha=0.6, aspect="auto")
+            axes[i].set_title(f"Ошибки {label} - Срез {slice_index}")
+            axes[i].axis("off")
 
             # Добавляем текст с информацией
             area_ratio = np.sum(mask) / mask.size * 100
-            axes[i].text(0.02, 0.98, f'Площадь: {area_ratio:.1f}%',
-                        transform=axes[i].transAxes, color='white',
-                        fontsize=10, verticalalignment='top',
-                        bbox=dict(boxstyle='round', facecolor='black', alpha=0.5))
+            axes[i].text(
+                0.02,
+                0.98,
+                f"Площадь: {area_ratio:.1f}%",
+                transform=axes[i].transAxes,
+                color="white",
+                fontsize=10,
+                verticalalignment="top",
+                bbox=dict(boxstyle="round", facecolor="black", alpha=0.5),
+            )
 
         plt.tight_layout()
         return self._fig_to_base64(fig)
@@ -261,17 +300,22 @@ class CTHeatmapGenerator:
     def _fig_to_base64(self, fig) -> str:
         """Конвертирует matplotlib figure в base64 строку."""
         buf = io.BytesIO()
-        fig.savefig(buf, format='png', dpi=150, bbox_inches='tight',
-                   facecolor='white', edgecolor='none')
+        fig.savefig(
+            buf,
+            format="png",
+            dpi=150,
+            bbox_inches="tight",
+            facecolor="white",
+            edgecolor="none",
+        )
         buf.seek(0)
-        png_data = base64.b64encode(buf.getvalue()).decode('utf-8')
+        png_data = base64.b64encode(buf.getvalue()).decode("utf-8")
         plt.close(fig)
         return png_data
 
-    def generate_comprehensive_heatmap_report(self,
-                                            original: np.ndarray,
-                                            reconstructed: np.ndarray,
-                                            study_id: str = "unknown") -> Dict:
+    def generate_comprehensive_heatmap_report(
+        self, original: np.ndarray, reconstructed: np.ndarray, study_id: str = "unknown"
+    ) -> Dict:
         """
         Генерирует комплексный отчет по heatmap для одного исследования.
 
@@ -282,13 +326,14 @@ class CTHeatmapGenerator:
         error_maps = self.calculate_error_map(original, reconstructed)
 
         # Находим репрезентативные срезы
-        slice_info = self.find_representative_slices(error_maps['mse_map'], original)
+        slice_info = self.find_representative_slices(error_maps["mse_map"], original)
 
         # Генерируем визуализации для каждого ключевого среза
         visualizations = {}
         for slice_name, slice_index in slice_info.items():
             visualizations[slice_name] = self.generate_slice_visualization(
-                original, reconstructed, error_maps['combined_map'], slice_index)
+                original, reconstructed, error_maps["combined_map"], slice_index
+            )
 
         # Статистика для каждой карты ошибок
         statistics = {}
@@ -297,49 +342,53 @@ class CTHeatmapGenerator:
 
         # Комплексный отчет
         report = {
-            'study_id': study_id,
-            'volume_shape': original.shape,
-            'error_maps': {
+            "study_id": study_id,
+            "volume_shape": original.shape,
+            "error_maps": {
                 # Для экономии памяти можно сохранять только статистику, а не полные массивы
-                'maps_available': list(error_maps.keys()),
-                'sample_data': {
+                "maps_available": list(error_maps.keys()),
+                "sample_data": {
                     name: {
-                        'shape': array.shape,
-                        'dtype': str(array.dtype),
-                        'min': float(np.min(array)),
-                        'max': float(np.max(array))
-                    } for name, array in error_maps.items()
-                }
+                        "shape": array.shape,
+                        "dtype": str(array.dtype),
+                        "min": float(np.min(array)),
+                        "max": float(np.max(array)),
+                    }
+                    for name, array in error_maps.items()
+                },
             },
-            'statistics': statistics,
-            'slice_info': slice_info,
-            'visualizations': visualizations,
-            'summary': {
-                'overall_mse': float(np.mean(error_maps['mse_map'])),
-                'max_slice_error': float(np.max(np.sum(np.sum(error_maps['mse_map'], axis=0), axis=0))),
-                'high_error_volume_ratio': statistics['mse_map']['error_volume_ratio'],
-                'quality_score': self._calculate_quality_score(statistics['mse_map'])
-            }
+            "statistics": statistics,
+            "slice_info": slice_info,
+            "visualizations": visualizations,
+            "summary": {
+                "overall_mse": float(np.mean(error_maps["mse_map"])),
+                "max_slice_error": float(
+                    np.max(np.sum(np.sum(error_maps["mse_map"], axis=0), axis=0))
+                ),
+                "high_error_volume_ratio": statistics["mse_map"]["error_volume_ratio"],
+                "quality_score": self._calculate_quality_score(statistics["mse_map"]),
+            },
         }
 
         # Для полного анализа можно вернуть сами массивы (осторожно с памятью!)
-        report['error_arrays'] = error_maps
+        report["error_arrays"] = error_maps
 
         return report
 
     def _calculate_quality_score(self, stats: Dict) -> float:
         """Вычисляет общий score качества реконструкции."""
         # Чем ниже ошибки и равномернее распределение, тем лучше
-        mean_error = stats['mean_error']
-        std_error = stats['std_error']
-        high_error_ratio = stats['error_volume_ratio']
+        mean_error = stats["mean_error"]
+        std_error = stats["std_error"]
+        high_error_ratio = stats["error_volume_ratio"]
 
         # Нормализуем метрики (эвристические веса)
         score = 1.0 / (1.0 + mean_error * 10)  # Основной вклад от средней ошибки
-        score *= 1.0 / (1.0 + std_error * 5)   # Штраф за неравномерность
+        score *= 1.0 / (1.0 + std_error * 5)  # Штраф за неравномерность
         score *= 1.0 / (1.0 + high_error_ratio * 2)  # Штраф за области высоких ошибок
 
         return max(0.0, min(1.0, score))
+
 
 # Пример использования
 def example_usage():
@@ -347,14 +396,17 @@ def example_usage():
 
     # Создаем тестовые данные
     original_volume = np.random.rand(128, 128, 64).astype(np.float32) * 0.8 + 0.1
-    reconstructed_volume = original_volume + np.random.normal(0, 0.05, original_volume.shape)
+    reconstructed_volume = original_volume + np.random.normal(
+        0, 0.05, original_volume.shape
+    )
 
     # Инициализируем генератор
     heatmap_gen = CTHeatmapGenerator()
 
     # Генерируем полный отчет
     report = heatmap_gen.generate_comprehensive_heatmap_report(
-        original_volume, reconstructed_volume, "test_study_001")
+        original_volume, reconstructed_volume, "test_study_001"
+    )
 
     print("✓ Heatmap отчет сгенерирован!")
     print(f"Study ID: {report['study_id']}")
@@ -363,11 +415,14 @@ def example_usage():
     print(f"Available visualizations: {list(report['visualizations'].keys())}")
 
     # Доступ к numpy arrays для анализа
-    mse_stats = report['statistics']['mse_map']
-    print(f"MSE Statistics - Max: {mse_stats['max_error']:.4f}, "
-          f"Mean: {mse_stats['mean_error']:.4f}, 95%: {mse_stats['percentile_95']:.4f}")
+    mse_stats = report["statistics"]["mse_map"]
+    print(
+        f"MSE Statistics - Max: {mse_stats['max_error']:.4f}, "
+        f"Mean: {mse_stats['mean_error']:.4f}, 95%: {mse_stats['percentile_95']:.4f}"
+    )
 
     return report
+
 
 if __name__ == "__main__":
     # Запуск примера

@@ -5,6 +5,12 @@
 {% block content %}
 <div style="max-width: 1000px; margin: 0 auto;">
     <h1>📋 Результаты анализа КТ исследований</h1>
+    <div style="text-align: center; margin: 20px 0; padding: 15px; background: #fff3cd; border-radius: 8px;">
+        <p style="margin: 0; color: #856404;">
+            ⏳ Обработка исследований может занимать до 10 минут<br>
+            🔄 Для отслеживания прогресса обновите страницу
+        </p>
+    </div>
     <p id="totalCount">Загрузка...</p>
 
     <div id="studiesContainer">
@@ -62,62 +68,55 @@ function displayStudies(data) {
     data.studies.forEach(study => {
         const hasErrorMessage = study.error_message && study.error_message.trim() !== '';
 
-        // Status color logic
-        let statusColor = '#ffc107'; // default: processing
-        let statusText = study.processing_status;
+        // ИСПРАВЛЕННАЯ логика статуса и патологии
+        const processingStatus = String(study.processing_status || '').toLowerCase();
+        const isErrorStatus = hasErrorMessage ||
+                            processingStatus === 'ошибка' ||
+                            processingStatus === 'failed' ||
+                            processingStatus === 'failure';
 
-        if (study.processing_status === 'обработано' || study.processing_status === 'COMPLETED') {
-            statusColor = '#28a745';
-            statusText = 'обработано';
-        } else if (study.processing_status === 'ошибка' || study.processing_status === 'FAILED') {
-            statusColor = '#dc3545';
-            statusText = 'ошибка';
-        } else if (study.processing_status === 'требует_проверки' || study.processing_status === 'NEEDS_REVIEW') {
-            statusColor = '#ff9800';
-            statusText = 'требует проверки';
-        } else if (study.processing_status === 'загружено' || study.processing_status === 'UPLOADED') {
-            statusText = 'загружено';
-        } else if (study.processing_status === 'распаковывается' || study.processing_status === 'EXTRACTING') {
-            statusText = 'распаковывается';
-        } else if (study.processing_status === 'анализируется_ИИ' || study.processing_status === 'PROCESSING_ML') {
-            statusText = 'анализируется ИИ';
-        }
+        const isCompleted = processingStatus === 'обработано' ||
+                          processingStatus === 'completed' ||
+                          processingStatus === 'success' ||
+                          (study.inference_completed && !isErrorStatus);
 
-        // Pathology determination - FIXED
-        let pathologyText = 'N/A';
-        let pathologyColor = '#6c757d';
+        const statusColor = isCompleted ? '#28a745' :
+                          isErrorStatus ? '#dc3545' : '#ffc107';
 
-        if (study.processing_status === 'ошибка' || study.processing_status === 'FAILED') {
-            pathologyText = 'N/A';
-            pathologyColor = '#6c757d';
-        } else if (study.processing_status === 'обработано' || study.processing_status === 'COMPLETED') {
+        // ИСПРАВЛЕННАЯ логика заключения
+        let pathologyText = '⏳ Обработка...';
+        let pathologyColor = '#ffc107';
+
+        if (isErrorStatus) {
+            pathologyText = 'ОШИБКА';
+            pathologyColor = '#dc3545';
+        } else if (isCompleted) {
+            // Проверяем явно наличие результата
             if (study.pathology === 1) {
                 pathologyText = 'ПАТОЛОГИЯ';
                 pathologyColor = '#dc3545';
             } else if (study.pathology === 0) {
                 pathologyText = 'НОРМА';
                 pathologyColor = '#28a745';
+            } else if (study.probability_of_pathology !== null && study.probability_of_pathology !== undefined) {
+                // Если pathology не установлен, но есть вероятность, определяем по порогу
+                pathologyText = study.probability_of_pathology > 0.5 ? 'ПАТОЛОГИЯ' : 'НОРМА';
+                pathologyColor = study.probability_of_pathology > 0.5 ? '#dc3545' : '#28a745';
             } else {
-                pathologyText = 'N/A';
+                pathologyText = 'ОБРАБОТАНО';
                 pathologyColor = '#6c757d';
             }
-        } else {
-            // Still processing
-            pathologyText = '⏳ Обработка...';
-            pathologyColor = '#ffc107';
         }
 
-        // Probability - only show if completed
-        const probability = (study.processing_status === 'обработано' || study.processing_status === 'COMPLETED') &&
-                          study.probability_of_pathology !== null ?
-                          (study.probability_of_pathology * 100).toFixed(1) + '%' :
-                          'N/A';
+        const probability = isCompleted && study.probability_of_pathology !== null && study.probability_of_pathology !== undefined ?
+                          (study.probability_of_pathology * 100).toFixed(1) + '%' : 'N/A';
 
+        // Остальной код без изменений...
         html += `
         <div class="study" style="border: 1px solid #ddd; border-radius: 8px; padding: 20px; margin: 15px 0; background: #f8f9fa;">
             <h3>Исследование #${study.id}: ${study.filename}</h3>
             <p><strong>Статус:</strong>
-                <span style="color: ${statusColor}; font-weight: bold;">${statusText}</span>
+                <span style="color: ${statusColor}; font-weight: bold;">${study.processing_status}</span>
             </p>
             <p><strong>Вероятность патологии:</strong> ${probability}</p>
             <p><strong>Результат:</strong>
@@ -128,25 +127,59 @@ function displayStudies(data) {
             ${study.most_dangerous_pathology_type ? `<p><strong>Тип патологии:</strong> ${study.most_dangerous_pathology_type}</p>` : ''}
             <p><strong>Загружено:</strong> ${new Date(study.created_at).toLocaleString('ru-RU')}</p>
 
-            <!-- Status-specific message div -->
-            <div id="status-${study.id}" style="display: none; margin: 10px 0;"></div>
-
-            <!-- Rest of your error handling code stays the same -->
+            <!-- БЛОК ОШИБКИ - показываем если есть error_message -->
             ${hasErrorMessage ? `
             <div class="error-section" style="background: #f8d7da; border: 1px solid #f5c6cb; border-radius: 5px; padding: 15px; margin: 15px 0;">
-                <!-- ... your existing error HTML ... -->
+                <h4 style="color: #721c24; margin-top: 0;">❌ Ошибка обработки</h4>
+                <div class="error-message" style="color: #721c24; margin-bottom: 10px;">
+                    <strong>Описание ошибки:</strong> ${study.error_message}
+                </div>
+                ${study.error_message.includes('DICOM') || study.error_message.includes('ZIP') || study.error_message.includes('архив') || study.error_message.includes('файлов') ? `
+                <div class="error-help" style="background: #fff3cd; border: 1px solid #ffeaa7; border-radius: 3px; padding: 10px;">
+                    <strong style="color: #856404;">💡 Что делать:</strong>
+                    <ul style="margin: 5px 0; color: #856404;">
+                        <li>Убедитесь, что архив содержит файлы в формате DICOM (.dcm)</li>
+                        <li>Проверьте, что архив не поврежден и правильно создан</li>
+                        <li>Используйте архив, полученный напрямую от медицинского оборудования</li>
+                        <li>Убедитесь, что размер архива не превышает 500MB</li>
+                    </ul>
+                </div>
+                ` : ''}
+                ${study.error_message.includes('обработк') || study.error_message.includes('обработать') || study.error_message.includes('процесс') || study.error_message.includes('памят') ? `
+                <div class="error-help" style="background: #fff3cd; border: 1px solid #ffeaa7; border-radius: 3px; padding: 10px;">
+                    <strong style="color: #856404;">💡 Что делать:</strong>
+                    <ul style="margin: 5px 0; color: #856404;">
+                        <li>Попробуйте загрузить файл еще раз</li>
+                        <li>Проверьте, что все DICOM файлы в архиве корректны</li>
+                        <li>Если ошибка повторяется, обратитесь в техническую поддержку</li>
+                    </ul>
+                </div>
+                ` : ''}
+                ${!study.error_message.includes('DICOM') && !study.error_message.includes('ZIP') && !study.error_message.includes('архив') && !study.error_message.includes('файлов') && !study.error_message.includes('обработк') && !study.error_message.includes('обработать') && !study.error_message.includes('процесс') && !study.error_message.includes('памят') ? `
+                <div class="error-help" style="background: #fff3cd; border: 1px solid #ffeaa7; border-radius: 3px; padding: 10px;">
+                    <strong style="color: #856404;">💡 Что можно сделать:</strong>
+                    <ul style="margin: 5px 0; color: #856404;">
+                        <li>Попробуйте загрузить файл еще раз</li>
+                        <li>Проверьте корректность исходных данных</li>
+                        <li>Обратитесь в техническую поддержку с описанием ошибки</li>
+                    </ul>
+                </div>
+                ` : ''}
             </div>
             ` : ''}
 
+            <!-- ДОБАВЛЕН БЛОК ДЛЯ СТАТУСА ОПЕРАЦИЙ -->
+            <div id="status-${study.id}" style="display: none; margin: 10px 0;"></div>
+
             <p>
                 <button class="btn export-btn" data-study-id="${study.id}"
-                        ${study.processing_status !== 'обработано' && study.processing_status !== 'COMPLETED' ? 'disabled' : ''}
-                        style="background: #28a745; color: white; padding: 8px 16px; border: none; border-radius: 4px; margin: 0 5px; cursor: pointer;">
+                        ${!isCompleted ? 'disabled' : ''}
+                        style="background: #28a745; color: white; padding: 8px 16px; border: none; border-radius: 4px; margin: 0 5px; cursor: pointer; ${!isCompleted ? 'opacity: 0.6; cursor: not-allowed;' : ''}">
                     📊 Excel отчет
                 </button>
                 <button class="btn heatmap-btn" data-study-id="${study.id}"
-                        ${study.processing_status !== 'обработано' && study.processing_status !== 'COMPLETED' ? 'disabled' : ''}
-                        style="background: #17a2b8; color: white; padding: 8px 16px; border: none; border-radius: 4px; margin: 0 5px; cursor: pointer;">
+                        ${!isCompleted ? 'disabled' : ''}
+                        style="background: #17a2b8; color: white; padding: 8px 16px; border: none; border-radius: 4px; margin: 0 5px; cursor: pointer; ${!isCompleted ? 'opacity: 0.6; cursor: not-allowed;' : ''}">
                     🖼️ Heatmap
                 </button>
                 <a class="btn" href="/demo/studies/${study.id}"
@@ -159,6 +192,8 @@ function displayStudies(data) {
     });
 
     container.innerHTML = html;
+
+    // Добавляем обработчики для кнопок
     addButtonHandlers();
 }
 
@@ -168,7 +203,7 @@ function addButtonHandlers() {
     document.querySelectorAll('.export-btn').forEach(btn => {
         btn.addEventListener('click', async function() {
             const studyId = this.getAttribute('data-study-id');
-            await downloadExcel(studyId);
+            await downloadExcel(studyId, this);
         });
     });
 
@@ -176,19 +211,18 @@ function addButtonHandlers() {
     document.querySelectorAll('.heatmap-btn').forEach(btn => {
         btn.addEventListener('click', async function() {
             const studyId = this.getAttribute('data-study-id');
-            await viewHeatmap(studyId);
+            await viewHeatmap(studyId, this);
         });
     });
 }
 
 // Функция для скачивания Excel
-async function downloadExcel(studyId) {
+async function downloadExcel(studyId, btn) {
     const statusDiv = document.getElementById(`status-${studyId}`);
-    const btn = document.querySelector(`.export-btn[data-study-id="${studyId}"]`);
 
     try {
         statusDiv.style.display = 'block';
-        statusDiv.innerHTML = '<div style="color: #856404;">⏳ Подготовка Excel отчета...</div>';
+        statusDiv.innerHTML = '<div style="background: #fff3cd; color: #856404; padding: 10px; border-radius: 5px;">⏳ Подготовка Excel отчета...</div>';
         btn.disabled = true;
         btn.innerHTML = '⏳ Подготовка...';
 
@@ -213,12 +247,12 @@ async function downloadExcel(studyId) {
             window.URL.revokeObjectURL(url);
             document.body.removeChild(a);
 
-            statusDiv.innerHTML = '<div style="color: #155724;">✅ Отчет успешно скачан</div>';
+            statusDiv.innerHTML = '<div style="background: #d4edda; color: #155724; padding: 10px; border-radius: 5px;">✅ Отчет успешно скачан</div>';
 
-            // Через 3 секунды скрываем статус
+            // Через 5 секунд скрываем статус
             setTimeout(() => {
                 statusDiv.style.display = 'none';
-            }, 3000);
+            }, 5000);
 
         } else {
             const errorText = await response.text();
@@ -230,10 +264,10 @@ async function downloadExcel(studyId) {
                 errorMessage = errorText;
             }
 
-            statusDiv.innerHTML = `<div style="color: #721c24;">❌ Ошибка: ${errorMessage}</div>`;
+            statusDiv.innerHTML = `<div style="background: #f8d7da; color: #721c24; padding: 10px; border-radius: 5px;">❌ Ошибка: ${errorMessage}</div>`;
         }
     } catch (error) {
-        statusDiv.innerHTML = `<div style="color: #721c24;">❌ Ошибка сети: ${error.message}</div>`;
+        statusDiv.innerHTML = `<div style="background: #f8d7da; color: #721c24; padding: 10px; border-radius: 5px;">❌ Ошибка сети: ${error.message}</div>`;
     } finally {
         btn.disabled = false;
         btn.innerHTML = '📊 Excel отчет';
@@ -246,27 +280,23 @@ async function downloadExcel(studyId) {
 }
 
 // Функция для просмотра Heatmap
-async function viewHeatmap(studyId) {
+async function viewHeatmap(studyId, btn) {
     const statusDiv = document.getElementById(`status-${studyId}`);
-    const btn = document.querySelector(`.heatmap-btn[data-study-id="${studyId}"]`);
 
     try {
         statusDiv.style.display = 'block';
-        statusDiv.innerHTML = '<div style="color: #856404;">⏳ Загрузка heatmap...</div>';
+        statusDiv.innerHTML = '<div style="background: #fff3cd; color: #856404; padding: 10px; border-radius: 5px;">⏳ Загрузка heatmap...</div>';
         btn.disabled = true;
         btn.innerHTML = '⏳ Загрузка...';
 
-        // Создаем iframe для отображения heatmap с авторизацией
-        const heatmapUrl = `/studies/${studyId}/heatmap`;
-
-        // Открываем heatmap в новой вкладке
+        // Создаем новое окно для heatmap
         const newWindow = window.open('', '_blank');
 
         // Показываем сообщение о загрузке
         newWindow.document.write(`
             <html>
                 <head><title>Heatmap исследования #${studyId}</title></head>
-                <body style="display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0;">
+                <body style="display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; background: #f5f5f5;">
                     <div style="text-align: center;">
                         <h2>Загрузка heatmap...</h2>
                         <p>Пожалуйста, подождите</p>
@@ -276,7 +306,7 @@ async function viewHeatmap(studyId) {
         `);
 
         // Загружаем heatmap с авторизацией
-        const response = await fetch(heatmapUrl, {
+        const response = await fetch(`/studies/${studyId}/heatmap`, {
             headers: {
                 'Authorization': `Bearer ${demoToken}`,
             }
@@ -325,7 +355,7 @@ async function viewHeatmap(studyId) {
                         <div class="container">
                             <div class="header">
                                 <h2>Heatmap исследования #${studyId}</h2>
-                                <p>Визуализация областей, которые модель считает аномальными</p>
+                                <p>Визуализация областей, которые модель считаes аномальными</p>
                             </div>
                             <img src="${imageUrl}" alt="Heatmap визуализация"
                                  onload="URL.revokeObjectURL(this.src)">
@@ -334,31 +364,34 @@ async function viewHeatmap(studyId) {
                 </html>
             `);
 
-            statusDiv.innerHTML = '<div style="color: #155724;">✅ Heatmap загружена</div>';
+            statusDiv.innerHTML = '<div style="background: #d4edda; color: #155724; padding: 10px; border-radius: 5px;">✅ Heatmap загружена в новой вкладке</div>';
 
         } else {
             const errorText = await response.text();
             newWindow.document.write(`
                 <html>
-                    <body style="display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0;">
-                        <div style="text-align: center; color: #721c24;">
-                            <h2>Ошибка загрузки heatmap</h2>
+                    <body style="display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; background: #f5f5f5;">
+                        <div style="text-align: center; background: white; padding: 30px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+                            <h2 style="color: #721c24;">Ошибка загрузки heatmap</h2>
                             <p>${errorText}</p>
+                            <button onclick="window.close()" style="margin-top: 15px; padding: 8px 16px; background: #dc3545; color: white; border: none; border-radius: 4px; cursor: pointer;">
+                                Закрыть
+                            </button>
                         </div>
                     </body>
                 </html>
             `);
 
-            statusDiv.innerHTML = `<div style="color: #721c24;">❌ Ошибка загрузки heatmap</div>`;
+            statusDiv.innerHTML = `<div style="background: #f8d7da; color: #721c24; padding: 10px; border-radius: 5px;">❌ Ошибка загрузки heatmap</div>`;
         }
 
-        // Через 3 секунды скрываем статус
+        // Через 5 секунд скрываем статус
         setTimeout(() => {
             statusDiv.style.display = 'none';
-        }, 3000);
+        }, 5000);
 
     } catch (error) {
-        statusDiv.innerHTML = `<div style="color: #721c24;">❌ Ошибка сети: ${error.message}</div>`;
+        statusDiv.innerHTML = `<div style="background: #f8d7da; color: #721c24; padding: 10px; border-radius: 5px;">❌ Ошибка сети: ${error.message}</div>`;
     } finally {
         btn.disabled = false;
         btn.innerHTML = '🖼️ Heatmap';

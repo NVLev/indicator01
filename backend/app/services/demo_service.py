@@ -1,4 +1,4 @@
-from typing import Optional, Dict, Any
+from typing import Any, Dict, Optional
 
 
 class DemoService:
@@ -16,10 +16,10 @@ class DemoService:
     @classmethod
     def get_auth_headers(cls) -> Dict[str, str]:
         """Возвращает headers с JWT токеном для API запросов"""
-        if cls._demo_tokens and cls._demo_tokens.get('access_token'):
+        if cls._demo_tokens and cls._demo_tokens.get("access_token"):
             return {
                 "Authorization": f"Bearer {cls._demo_tokens['access_token']}",
-                "Content-Type": "application/json"
+                "Content-Type": "application/json",
             }
         return {}
 

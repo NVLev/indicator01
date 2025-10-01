@@ -1,5 +1,5 @@
 try:
-    from backend.app.core.models import Base, User, RefreshToken, Study
+    from backend.app.core.models import Base, RefreshToken, Study, User
 
     print("✅ All models imported successfully")
     print("Tables in Base.metadata:", Base.metadata.tables.keys())

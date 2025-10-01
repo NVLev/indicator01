@@ -8,7 +8,6 @@ from ..core.config import settings
 from ..core.db_helper import db_helper
 from ..core.models import User
 
-
 security = HTTPBearer()
 
 
@@ -41,4 +40,4 @@ async def get_current_user(
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED, detail="Пользователь не найден"
         )
-    return user     # noqa: игнорируй эту ошибку
+    return user  # noqa: игнорируй эту ошибку

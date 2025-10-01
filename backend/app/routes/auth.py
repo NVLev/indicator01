@@ -1,17 +1,24 @@
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timedelta, timezone
 
-from jose import JWTError, jwt
-
-from ..core.config import settings
-from ..services.auth_service import AuthService, pwd_context
-from ..core.db_helper import db_helper
-from ..core.models import User, RefreshToken
-from ..core.schemas import Token, TokenResponse, UserCreate, UserRead, LoginRequest, RefreshTokenRequest
-from ..services.security import get_current_user
 from fastapi import APIRouter, Depends, HTTPException
+from jose import JWTError, jwt
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 from sqlalchemy.orm import selectinload
+
+from ..core.config import settings
+from ..core.db_helper import db_helper
+from ..core.models import RefreshToken, User
+from ..core.schemas import (
+    LoginRequest,
+    RefreshTokenRequest,
+    Token,
+    TokenResponse,
+    UserCreate,
+    UserRead,
+)
+from ..services.auth_service import AuthService, pwd_context
+from ..services.security import get_current_user
 
 router = APIRouter(prefix="/auth", tags=["Auth"])
 
@@ -50,17 +57,19 @@ async def register(
 async def login(
     credentials: LoginRequest, session: AsyncSession = Depends(db_helper.session_getter)
 ):
-    auth_result = await AuthService.authenticate(credentials.email, credentials.password, session)
+    auth_result = await AuthService.authenticate(
+        credentials.email, credentials.password, session
+    )
     # user = await AuthService.authenticate(credentials.email, credentials.password, session)
     #
     # refresh_token, jti, iat, exp = AuthService.create_refresh_token(user["user_id"])
-
 
     return {
         "access_token": auth_result["access_token"],
         "refresh_token": auth_result["refresh_token"],
         "token_type": "bearer",
     }
+
 
 @router.post("/refresh", response_model=Token)
 async def refresh(
@@ -95,14 +104,15 @@ async def refresh(
 
 @router.post("/logout")
 async def logout(
-    token_data: RefreshTokenRequest, session: AsyncSession = Depends(db_helper.session_getter)
+    token_data: RefreshTokenRequest,
+    session: AsyncSession = Depends(db_helper.session_getter),
 ):
     refresh_token = token_data.refresh_token
     try:
         payload = jwt.decode(
             refresh_token,
             settings.auth.secret_key,
-            algorithms=[settings.auth.algorithm]
+            algorithms=[settings.auth.algorithm],
         )
         user_id = int(payload.get("sub"))
         if payload.get("type") != "refresh":
@@ -111,8 +121,8 @@ async def logout(
         raise HTTPException(status_code=401, detail="Invalid refresh token")
 
     stmt = select(RefreshToken).where(
-        RefreshToken.user_id == user_id,
-        RefreshToken.revoked == False)
+        RefreshToken.user_id == user_id, RefreshToken.revoked == False
+    )
     result = await session.execute(stmt)
     tokens = result.scalars().all()
     for token in tokens:
@@ -130,10 +140,7 @@ async def get_me(
     current_user: User = Depends(get_current_user),
     session: AsyncSession = Depends(db_helper.session_getter),
 ):
-    stmt = (
-        select(User)
-        .where(User.id == current_user.id)
-    )
+    stmt = select(User).where(User.id == current_user.id)
     result = await session.execute(stmt)
     user = result.scalar_one_or_none()
 
@@ -141,4 +148,3 @@ async def get_me(
         raise HTTPException(status_code=404, detail="User not found")
 
     return user
-
