@@ -1,5 +1,5 @@
 # 🩺 AI Service for Chest CT Scan Analysis
-
+[🇷🇺 Читать на русском](#russian-version)
 ## 📋 Overview
 An AI-powered service for automated analysis of chest computed tomography (CT) studies.  
 The system accepts DICOM studies packaged as ZIP archives, processes them using a machine learning model, and generates detailed reports with visualizations of potential pathology regions.
@@ -187,6 +187,9 @@ The project is released for educational and research purposes.
 Non-commercial use is permitted with attribution.  
 Commercial use requires explicit permission from the copyright holders.
 
+<a name="russian-version"></a>
+
+## 🇷🇺 Русская версия
 
 # 🩺 ИИ-сервис анализа КТ исследований грудной клетки
 
