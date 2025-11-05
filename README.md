@@ -1,3 +1,193 @@
+# 🩺 AI Service for Chest CT Scan Analysis
+
+## 📋 Overview
+An AI-powered service for automated analysis of chest computed tomography (CT) studies.  
+The system accepts DICOM studies packaged as ZIP archives, processes them using a machine learning model, and generates detailed reports with visualizations of potential pathology regions.
+
+A key feature of the project is the **RAG-based verification system** integrated into the backend.  
+When the model classifies a study as *normal*, an additional module checks the attention map (heatmap) and flags suspicious cases — reducing the risk of false negatives.
+
+---
+
+## 🎯 Key Features
+- 📤 Upload of studies (ZIP archives containing DICOM files)  
+- ⚙️ Asynchronous processing with Celery workers  
+- 🤖 AI analysis: pathology probability (normal / abnormal)  
+- 🗺️ Heatmap visualization highlighting model attention regions  
+- 📍 Pathology localization (coordinates in reports)  
+- 📊 Excel reports (structured per technical specifications)  
+- 🔑 JWT authentication  
+- 🌐 Fully documented REST API  
+- 🧪 Demo mode (ready-to-use backend UI for evaluation)  
+- 🛡️ RAG-based verification of “normal” predictions (VerificationEngine)
+
+---
+
+## 📁 Supported Formats
+- **Input:** ZIP archives with DICOM files (`.dcm`)  
+- **Output:** Excel reports (`.xlsx`), PNG heatmaps  
+- **Maximum file size:** 500 MB per archive  
+- **Encoding standard:** DICOM  
+
+---
+
+## 🖥️ System Requirements
+### Minimum
+- Docker 20.10+  
+- Docker Compose 2.0+  
+- 8 GB RAM  
+- 10 GB free disk space  
+
+### Recommended
+- 16 GB RAM  
+- 50+ GB free disk space  
+- NVIDIA GPU (8 GB+) for full ML model performance  
+
+---
+
+## 🚀 Quick Start (Recommended for testing large volumes, e.g., 200+ archives)
+1. **Clone the repository:**
+   ```bash
+   git clone https://github.com/NVLev/indicator01
+   cd indicator01
+   ```
+
+2. **Configure the environment:**
+   ```bash
+   cp .env.template .env
+   # Edit .env as needed
+   ```
+
+3. **Build and run services:**
+
+   #### Build images before first launch:
+   ```bash
+   docker compose build
+   ```
+
+   #### Start database and apply migrations:
+   ```bash
+   docker compose --profile migrations up -d
+   ```
+
+   **Alternatively, step-by-step:**
+   ```bash
+   docker compose up pg -d
+   docker compose --profile migrations run --rm alembic alembic upgrade head
+   docker compose up -d
+   ```
+
+4. **Check running services:**
+   - Demo interface: [http://localhost:8000/demo/](http://localhost:8000/demo/)  
+   - API Docs: [http://localhost:8000/docs](http://localhost:8000/docs)  
+
+   To monitor logs:
+   ```bash
+   docker compose logs -f backend
+   docker compose logs -f ml_service
+   docker compose logs -f celery_worker
+   ```
+
+---
+
+## 📊 API Features
+### 🔐 Authentication
+- `POST /auth/register` — Register a new user  
+- `POST /auth/login` — Obtain a JWT token  
+
+### 📁 Study Management
+#### Upload Studies
+- `POST /studies/upload` — Upload a single study (ZIP archive)  
+- `POST /studies/upload/bulk` — Upload up to 20 studies at once  
+
+#### Retrieve Study Information
+- `GET /studies/` — List user studies with pagination  
+- `GET /studies/{study_id}` — Get detailed study information  
+- `GET /studies/{study_id}/progress` — Check processing progress  
+
+#### Export and Visualization
+- `GET /studies/{study_id}/export` — Export results to Excel (per specifications)  
+- `GET /studies/{study_id}/heatmap` — Retrieve PNG heatmap visualization  
+
+#### Study Management
+- `POST /studies/{study_id}/retry` — Retry failed study processing  
+- `DELETE /studies/{study_id}` — Delete study and associated files  
+
+---
+
+## 🛡️ RAG Verification System
+To reduce false “normal” classifications, the **VerificationEngine** module analyzes the model’s heatmap and evaluates prediction reliability.  
+This is crucial for identifying borderline or ambiguous studies.
+
+**Validation aspects include:**
+- Focus on relevant anatomical areas  
+- Absence of edge artifacts  
+- Informative activation map distribution  
+- Proper heatmap attention spread  
+
+**Verification results:**
+- ✅ `accept_normal` — prediction deemed reliable  
+- ⚠️ `manual_review_recommended` — human review suggested  
+- 🚨 `manual_review_required` — high probability of model error  
+
+---
+
+## 📁 Project Structure
+```bash
+indicator01/
+├── backend/                 # FastAPI application
+│   ├── app/
+│   │   ├── main.py          # Application entry point
+│   │   ├── routes/          # HTTP endpoints
+│   │   │   ├── auth.py
+│   │   │   ├── studies.py
+│   │   │   └── demo.py
+│   │   ├── services/        # Business logic
+│   │   │   ├── auth_service.py
+│   │   │   ├── study_service.py
+│   │   │   └── demo_service.py
+│   │   ├── static/          # Static assets
+│   │   ├── templates/       # HTML templates for demo
+│   │   ├── core/            # Core modules
+│   │   │   ├── models.py
+│   │   │   ├── schemas.py
+│   │   │   └── config.py
+│   ├── workers/
+│   │   └── tasks.py         # Celery tasks
+│   └── requirements_backend.txt
+├── front_documentation/
+│   ├── api_spec.json
+│   └── API_SPEC_FULL.md
+├── ML_model/
+│   ├── Inference.py
+│   ├── heatmap.py
+│   └── ML_model.py
+├── docker-compose.yml
+├── Dockerfile
+├── Dockerfile.ml
+└── .env.template
+```
+
+---
+
+## 🧑‍💻 Authors and Credits
+
+### Project Author
+**Natalia Levant** — system architecture, backend, API design, documentation, and deployment  
+GitHub: [https://github.com/NVLev](https://github.com/NVLev)
+
+### ML Model Development
+**Data Scientist — AllexShv**  
+GitHub: [https://github.com/AllexShv](https://github.com/AllexShv)  
+(CT analysis model design and training)
+
+### Copyright Notice
+© 2025 Natalia Levant and collaborators.  
+The project is released for educational and research purposes.  
+Non-commercial use is permitted with attribution.  
+Commercial use requires explicit permission from the copyright holders.
+
+
 # 🩺 ИИ-сервис анализа КТ исследований грудной клетки
 
 ## 📋 Краткое описание
@@ -31,39 +221,7 @@
 
 ---
 
-## ⚠️ Ограничения по проверке
 
-Сервер развёрнут на ВМ без GPU с ограниченными ресурсами:  
-**4 vCPU, 16 GB RAM, 50 GB SSD**  
-
-Поэтому вводятся следующие ограничения:
-1. Не более **5 файлов одновременно** в загрузке.  
-2. Максимальный размер одного архива: **500 MB**.  
-3. Массовая загрузка: не более **20 файлов** за раз.  
-4. Архивы удаляются после распаковки, в системе остаются только результаты анализа.  
-
-### 🔎 Варианты проверки задания
-
-1. **На нашем сервере через демо-интерфейс**  
-   - Демо-интерфейс: [http://89.169.160.205:8000/demo/](http://89.169.160.205:8000/demo/)  
-   - **Автоматическая аутентификация** - демо-пользователь создается автоматически при первом посещении
-   - **Простой интерфейс** для загрузки файлов и просмотра результатов
-   - **Визуализация heatmap** и скачивание отчетов
-   
-2. **В Swagger**  
-   - API Docs: [http://89.169.160.205:8000/docs](http://89.169.160.205:8000/docs)  
-
-   ⚙️ Порядок действий:  
-   1. Перейдите в **API Docs**.  
-   2. Зарегистрируйтесь с помощью эндпоинта `/auth/register`.  
-   3. Выполните вход через `/auth/login` и получите `access_token`.  
-   4. Нажмите кнопку **Authorize** в верхней части Swagger UI и вставьте токен.  
-   5. Теперь вы можете тестировать остальные эндпоинты — загрузку исследований, просмотр прогресса и скачивание результатов. 
-   - - В API интерфейсе `/studies/{study_id}` можно посмотреть наиболее полную информацию о результатах обработки
-
-   📖 Подробная спецификация API приведена в файле **API_SPEC_FULL.md**.
-
----
 ## Запуск локально
 
 ## 🖥️ Системные требования
@@ -165,7 +323,7 @@ docker compose logs -f celery_worker
 - `POST /studies/upload/bulk` — массовая загрузка (до 20 файлов)
 - `POST /export/bulk` — массовый экспорт в Excel
 
-Полная спецификация доступна в [API Docs](http://89.169.160.205:8000/docs).
+
 
 ---
 
@@ -228,9 +386,19 @@ indicator01/
 └── .env.template          # Шаблон переменных окружения
 ```
 
----
+## Авторские права и участие
 
-## 🔗 Полезные ссылки
-- Демо-интерфейс: [http://89.169.160.205:8000/demo/](http://89.169.160.205:8000/demo/)  
-- API Docs: [http://89.169.160.205:8000/docs](http://89.169.160.205:8000/docs)  
-- Swagger UI: встроен в FastAPI  
+### Автор проекта:
+Natalia Levant — разработка архитектуры, бэкенда, API, документации и развёртывания
+GitHub: https://github.com/NVLev
+
+### Разработка ML-модели:
+Data Scientist — AllexShv
+GitHub: https://github.com/AllexShv
+(архитектура и обучение модели для анализа КТ-изображений)
+
+### Авторские права:
+© 2025 Natalia Levant и соавторы.
+Проект опубликован в образовательных и исследовательских целях.
+Разрешено использование кода в некоммерческих проектах с обязательной ссылкой на авторов.
+Для коммерческого использования требуется согласование с правообладателями.
